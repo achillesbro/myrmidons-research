@@ -1,0 +1,11 @@
+# MNEMON Parquet snapshot (rsync target) — never committed
+data/*
+!data/.gitkeep
+
+.venv/
+*.duckdb
+.ipynb_checkpoints/
+__pycache__/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
