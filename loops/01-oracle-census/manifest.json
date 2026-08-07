@@ -1,0 +1,10 @@
+{
+  "snapshot_date": "2026-08-07",
+  "mnemon_commit": "25b03b8490b9f89906fa1dd8bfd576917ac16ad5",
+  "metron_version": "v1.0.0",
+  "tables": [
+    "market_state",
+    "markets",
+    "prices"
+  ]
+}
