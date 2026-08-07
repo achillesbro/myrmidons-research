@@ -25,6 +25,23 @@ Re-introspected api.morpho.org/graphql, confirming MNEMON's SCHEMA_NOTES.md:
   overlap, AVLT's oracle sits constant at 1.0945 while that reference moved
   ~1.01 → ~1.04 → ~0.32. The pre-depeg NAV trajectory is unrecoverable.
 
+## Reference price (`prices`) timestamp semantics (checked 2026-08-07)
+
+- `morpho_history` rows (192k, hourly, 2025-04-25 → 2026-07-28): provider-
+  timestamped points from `Asset.historicalPriceUsd`, floored to the hour.
+  Writes stop 2026-07-28 — live llama coverage takes over.
+- `llama` rows (50k, 15-min, since 2026-07-09): ts is the JOB bucket
+  (`floor_ts(now, 900)`); DeFiLlama's own quote timestamp is discarded by
+  `normalize.price_rows_llama_current`, so the quote may be minutes older
+  than ts. Optional MNEMON improvement if sub-15-min alignment ever matters:
+  store the provider quote timestamp as a `quote_ts` column.
+- DeFiLlama began listing AVLT in July 2026 — its 15-min rows continue where
+  morpho_history ends.
+- Divergence-lane consequence (also stated in README Data): oracle (5-min,
+  discrete process) vs reference (15-min/hourly, continuous process) → only
+  divergences sustained >= one reference interval are resolvable; ASOF join
+  on last known reference; flash wicks out of scope.
+
 ## AVLT depeg facts (anchor for lane 3)
 
 - Depeg ~2026-06-21 (Altura insolvency). MYRMIDONS never allocated into the

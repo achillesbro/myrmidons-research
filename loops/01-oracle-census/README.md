@@ -24,7 +24,13 @@ backfill. Coverage boundaries and known feed gaps are recorded in this loop's
 CLAUDE.md.
 
 Sampling note: 5-minute snapshots observe price *changes*, not on-chain update
-events; "staleness" throughout means runs of unchanged observed price.
+events; "staleness" throughout means runs of unchanged observed price. The
+oracle series samples a discretely-updating process, so little is lost at
+5 minutes; the reference series samples a continuously-moving market price at
+15-minute (live) or hourly (historical) cadence, so the divergence screen
+resolves only divergences sustained for at least one reference interval, joins
+oracle to reference as-of the last known reference point, and treats anything
+shorter as noise. Flash depegs are out of scope by construction.
 
 ## Method
 
