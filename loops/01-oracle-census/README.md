@@ -36,11 +36,17 @@ Three lanes; SQL does extraction only, statistics live in METRON.
 
 Coverage constraints (checked 2026-08-07): live oracle-price capture began
 2026-07 for all 63 covered markets (8 have none) — the census and divergence
-lanes run on ~1 month of 5-min data. AVLT has NO oracle prices before
-2026-07-21, i.e. none pre-depeg: its anatomy uses the DeFiLlama market price
-(spans the depeg, 2026-04-28→) plus utilization/supply/borrow from backfilled
-state, and the oracle enters only as the post-depeg assertion gap (NAV vs
-collapsed market price). PT-hbUSDT-18DEC2025's DeFiLlama feed died 2026-05-03
+lanes run on ~1 month of 5-min data. Verified against the live Morpho API
+(2026-08-07): historical oracle prices canNOT be fetched by timestamp —
+`MarketHistory` has no price field, the `Oracle` entity has no timeseries,
+and `Asset.historicalPriceUsd` is an independent market reference, not the
+oracle feed (proof: AVLT's oracle sits frozen at 1.0945 while that reference
+collapsed to ~0.32). AVLT has NO oracle prices before 2026-07-21, i.e. none
+pre-depeg: its anatomy uses the `prices` table reference (source
+`morpho_history`, spans the depeg, 2026-04-28→) plus utilization/supply/
+borrow from backfilled state, and the oracle enters as the frozen post-depeg
+assertion gap (NAV 1.0945 vs ~0.32 market, ~3.4x collateral overvaluation).
+PT-hbUSDT-18DEC2025's DeFiLlama feed died 2026-05-03
 (frozen reference — noted, not a divergence signal).
 
 Sampling caveat: 5-min snapshots observe price *changes*, not on-chain update
