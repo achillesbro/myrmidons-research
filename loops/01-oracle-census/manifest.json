@@ -1,6 +1,6 @@
 {
   "snapshot_date": "2026-08-07",
-  "mnemon_commit": "25b03b8490b9f89906fa1dd8bfd576917ac16ad5",
+  "mnemon_commit": "abde3c1d60b2ba591aeec0978ccc60cd846b5c39",
   "metron_version": "v1.0.0",
   "tables": [
     "market_state",

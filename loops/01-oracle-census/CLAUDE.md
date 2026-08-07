@@ -42,6 +42,20 @@ Re-introspected api.morpho.org/graphql, confirming MNEMON's SCHEMA_NOTES.md:
   divergences sustained >= one reference interval are resolvable; ASOF join
   on last known reference; flash wicks out of scope.
 
+## llama_fine backfill (2026-08-07, MNEMON PR #17)
+
+- MNEMON now captures every native DeFiLlama point at its provider timestamp
+  (source `llama_fine`) — live every 15 min plus a one-shot deep backfill.
+  Snapshot re-synced same day (manifest updated to MNEMON abde3c1): 719,397
+  fine rows, 27 tokens, back to 2025-04-25.
+- Resolution varies with llama's own storage: ~10-15 min recently, hourly for
+  low-liquidity tokens further back. AVLT's June depeg window is hourly
+  (336 points, median gap 3600s) — true timestamps, same density as
+  morpho_history there.
+- Prefer `llama_fine` as the divergence-lane reference; it supersedes the
+  bucket-stamped `llama` rows and the hour-floored histories wherever both
+  exist.
+
 ## AVLT depeg facts (anchor for lane 3)
 
 - Depeg ~2026-06-21 (Altura insolvency). MYRMIDONS never allocated into the
