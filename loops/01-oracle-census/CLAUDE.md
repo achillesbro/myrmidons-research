@@ -64,12 +64,31 @@ Re-introspected api.morpho.org/graphql, confirming MNEMON's SCHEMA_NOTES.md:
   Borrower positions at any historical ts are reconstructable from flows
   (the hourly `positions` snapshots with API health factors only start
   2026-07-09).
-- Realized bad debt across ALL HyperEVM liquidations ≈ $185 total (157
-  events, largest USH/sUSDe ≈ $153, rest dust). AVLT appears NOWHERE in the
-  bad-debt log: the frozen 1.0945 NAV keeps liquidations from ever
-  triggering, so the one real loss is unrealized by construction. The
-  recorded bad-debt metric is blind to exactly the assertion-oracle failure
-  mode — state this in the census conclusion.
+- Realized bad debt across ALL HyperEVM liquidations ≈ $185 total (141
+  events, largest USH/sUSDe ≈ $153, rest dust). AVLT appears nowhere in it.
+
+## Liquidation mechanics under a frozen oracle (corrected 2026-08-07)
+
+Eloi's correction, verified against market_flows — an earlier claim here that
+"the frozen oracle keeps liquidations from triggering" was WRONG:
+
+- A frozen oracle does NOT block liquidations; only an oracle that returns no
+  price (reverts) does. AVLT's returns a stale constant, so liquidate() works.
+- 750 liquidations fired in the AVLT market 2026-06-25 → 2026-08-02, 5.2M
+  USDT0 repaid, one liquidator = 67% of it. Every one executed at the frozen
+  mark: implied seize price 1.06658 = oracle 1.094493 / LIF, where
+  LIF = 1/(1 - 0.3*(1 - lltv)) = 1.02617 at lltv 0.915. Exact to 5 dp.
+- The trigger is INTEREST ACCRUAL, not repricing: 639% APY at target with
+  100% utilization grows debt into the LLTV while the mark stands still.
+  Median HF 0.776 → 0.687 → 0.604 over three weeks, 253 borrowers.
+- Bad debt stays zero because Morpho books it only when a liquidation
+  exhausts collateral with debt remaining. At an inflated mark collateral
+  always looks sufficient, so the shortfall transfers to the liquidator
+  instead of being booked. Realization needs the oracle to converge to
+  market, or interest to accrue past what the frozen mark covers.
+- Open question (not answerable from this data, do NOT speculate in the
+  README): why anyone liquidates at a guaranteed ~77% loss. Motive would need
+  on-chain identity work or a redemption/claim story on AVLT.
 
 ## Census run surprises (2026-08-07)
 

@@ -77,24 +77,37 @@ two-sided-stable: features to model, not alerts.
 The AVLT anatomy: borrows accelerated *into* the depeg (4.2M USDT0 the week
 of 2026-06-21 — depositing NAV-marked collateral and borrowing against it was
 the rational exit); 7.5M of 9.8M supplied USDT0 escaped in a four-week
-supply/repay rotation; 2.2M remains trapped at 100% utilization against
+supply/repay rotation; 2.35M remains trapped at 100% utilization against
 collateral the oracle marks at 1.0945 and the market prices near 0.10–0.25.
-Recorded bad debt on the whole chain, all time: 157 events, ≈ $185. The AVLT
-hole ($1.5–2M economic) does not appear in it, because the frozen oracle
-prevents the liquidations that would record it.
+
+Liquidations were not blocked. 750 fired between 2026-06-25 and 2026-08-02
+(5.2M USDT0 repaid, one address accounting for 67% of it), every one at the
+frozen oracle mark: the implied seize price of 1.06658 equals oracle / LIF for
+this market's LLTV of 0.915 to five decimals. The trigger is interest accrual,
+not collateral repricing — at 639% APY-at-target and 100% utilization, debt
+grows into the LLTV while the mark stands still. Median borrower health factor
+fell 0.776 → 0.604 over three weeks with 253 borrowers liquidatable and mostly
+unliquidated, since repaying real USDT0 for collateral marked over 4x above
+market is a guaranteed loss to the liquidator. Recorded bad debt for the
+market remains zero, against a chain-wide all-time total of 141 events and
+≈ $185.
 
 ## Conclusion
 
 On one month of live oracle data, behavioral fingerprints classify every
 HyperEVM oracle without reading a single contract, and the divergence screen
-finds real events at every severity: a fatal frozen NAV (AVLT), a loan-token
-depeg (USH), and a par-asserting LST dip (kHYPE) — but the census's sharpest
-finding is about the metric, not the markets. Recorded bad debt measures only
-what liquidations realize, and assertion-priced oracles suppress liquidations
-precisely when losses occur, so the standard risk number is structurally
-blind to the worst failure mode. Exposure accounting should therefore weight
-markets by oracle class — frozen/NAV-assertion collateral is unpriceable risk
-regardless of its history — and the divergence screen (persistent |deviation|
-≥ 2% on a market-priced leg) is a workable standing alert, while staleness
-alone is not a signal: the most stale-looking healthy oracles (live PTs,
-heartbeat feeds) are benign by construction.
+finds real events at every severity: a frozen NAV (AVLT), a loan-token depeg
+(USH), and a par-asserting LST dip (kHYPE). The sharpest finding, though, is
+about the metric rather than the markets. Morpho books bad debt only when a
+liquidation exhausts a position's collateral and debt remains; at an inflated
+mark the collateral always *appears* sufficient, so the shortfall is never
+booked and instead transfers to whoever chose to liquidate. Realization would
+require the oracle converging to the market price, or interest accruing past
+what even the frozen mark can cover — so recorded bad debt lags the economic
+loss by however long the assertion holds, and reads zero throughout. Exposure
+accounting should therefore weight markets by oracle class — collateral priced
+by issuer assertion is unpriceable risk regardless of its recorded history —
+and the divergence screen (persistent |deviation| ≥ 2% on a market-priced leg)
+is a workable standing alert, while staleness alone is not a signal: the most
+stale-looking healthy oracles (live PTs, heartbeat feeds) are benign by
+construction.
