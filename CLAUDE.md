@@ -34,10 +34,13 @@ can never drift from what the ingestion produces. Table docs: MNEMON's
 
 ## Loop convention
 
-`loops/NN-slug/` with `README.md` (question, method, result, one-paragraph
-conclusion), `manifest.json`, `notebook.ipynb`. Numbered in order started;
-never renumber. `data/` is gitignored — the rsync target for the VPS snapshot
-(see README).
+`loops/NN-slug/` with `README.md` (question, data, method, result,
+one-paragraph conclusion), `manifest.json`, `notebook.ipynb`, and `CLAUDE.md`
+(working notes). Numbered in order started; never renumber. The README reads
+like a methodology paper — no dated observations, no "verified on ..."
+narration, no conversational asides; those go in the loop's CLAUDE.md as they
+are found. `data/` is gitignored — the rsync target for the VPS snapshot (see
+README).
 
 ## Commands
 
