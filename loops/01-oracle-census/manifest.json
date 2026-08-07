@@ -5,6 +5,7 @@
   "tables": [
     "market_state",
     "markets",
-    "prices"
+    "prices",
+    "market_flows"
   ]
 }

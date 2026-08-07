@@ -56,8 +56,45 @@ HEGEMON V1 stuck periods, utilization/exit-capacity screen).
 
 ## Result
 
-(not run yet)
+Fingerprints for 63 markets (~4,900–7,000 five-minute samples each) separate
+cleanly into four behaviors: 32 market-rate (sparse two-sided heartbeats —
+UBTC/UETH/WHYPE families, stale-share 0.8–0.96 but up-share ≈ 0.5), 14
+exchange-rate (accrual oracles, ≥90% of changes upward — LSTs, hbUSDT), 14
+NAV/sparse, and 3 frozen (AVLT at zero changes in 4,906 samples with a 17-day
+stale stretch; hbHYPE/WHYPE and the matured PT-13NOV2025 at 29 days). Live PT
+markets update every sample near-monotonically — stale-looking by reputation,
+benign by measurement.
+
+The divergence screen flags, in order of severity: AVLT/USDT0 (time-weighted
+mean deviation +196%, max +1035% — the frozen NAV against a collapsing market
+price), sUSDe/USH (−31%, one 8-day ≥5% spell — a loan-token depeg, showing
+divergence catches either leg), a USDH wobble (7.6% peak, ~30 short spells),
+and a kHYPE market dip of ~4% on 2026-07-29 that every kHYPE exchange-rate
+oracle asserted par through — the exact failure class this screen exists for,
+at survivable size. Structural premia (thBILL +1.5% mean) are persistent and
+two-sided-stable: features to model, not alerts.
+
+The AVLT anatomy: borrows accelerated *into* the depeg (4.2M USDT0 the week
+of 2026-06-21 — depositing NAV-marked collateral and borrowing against it was
+the rational exit); ~7.5M of 9.8M supplied USDT0 escaped in a four-week
+supply/repay rotation; 2.2M remains trapped at 100% utilization against
+collateral the oracle marks at 1.0945 and the market prices near 0.10–0.25.
+Recorded bad debt on the whole chain, all time: 157 events, ≈ $185. The AVLT
+hole (~$1.5–2M economic) does not appear in it, because the frozen oracle
+prevents the liquidations that would record it.
 
 ## Conclusion
 
-(one paragraph, written after the run)
+On one month of live oracle data, behavioral fingerprints classify every
+HyperEVM oracle without reading a single contract, and the divergence screen
+finds real events at every severity: a fatal frozen NAV (AVLT), a loan-token
+depeg (USH), and a par-asserting LST dip (kHYPE) — but the census's sharpest
+finding is about the metric, not the markets. Recorded bad debt measures only
+what liquidations realize, and assertion-priced oracles suppress liquidations
+precisely when losses occur, so the standard risk number is structurally
+blind to the worst failure mode. Exposure accounting should therefore weight
+markets by oracle class — frozen/NAV-assertion collateral is unpriceable risk
+regardless of its history — and the divergence screen (persistent |deviation|
+≥ 2% on a market-priced leg) is a workable standing alert, while staleness
+alone is not a signal: the most stale-looking healthy oracles (live PTs,
+heartbeat feeds) are benign by construction.

@@ -71,6 +71,28 @@ Re-introspected api.morpho.org/graphql, confirming MNEMON's SCHEMA_NOTES.md:
   recorded bad-debt metric is blind to exactly the assertion-oracle failure
   mode — state this in the census conclusion.
 
+## Census run surprises (2026-08-07)
+
+- MNEMON already ships the divergence per-row algebra: `v_oracle_price_check`
+  (oracle vs ASOF DeFiLlama, both legs as collateral-in-loan-tokens) and
+  `v_depeg_spells` (2%/5% episodes, 2h hole tolerance). Lane 2 consumes them
+  and adds METRON stats — don't re-derive the SQL.
+- hbHYPE/WHYPE oracle frozen 29 days (0 changes) — a second live frozen
+  oracle beyond AVLT, unnoticed. Worth a qualitative look at that oracle.
+- sUSDe/USH −31% deviation is the LOAN token depegging (USH), not the
+  collateral: divergence catches either leg; sign tells which.
+- kHYPE dipped ~4% on 2026-07-29 ~19:45 and every kHYPE exchange-rate oracle
+  asserted par through it — first live observation of the class the user
+  worried about; survivable size this time.
+- AVLT flows: borrows ACCELERATED into the depeg (borrow-against-NAV was the
+  smart exit); exit happened via matched supply/repay-withdraw rotations over
+  ~4 weeks (weekly Supply ≈ Withdraw to the dollar, 23.5M gross in the
+  biggest week); 2.2M USDT0 trapped at 100% util since 2026-07-20.
+- Loan-side Supply/Withdraw in market_flows shows 1-7 distinct accounts —
+  vault-intermediated; the exit door belonged to a couple of curators.
+- up_share with <=10 nonzero changes is NaN → classifier sends those to
+  nav/sparse; fine descriptively, revisit if the census ever drives sizing.
+
 ## AVLT depeg facts (anchor for lane 3)
 
 - Depeg ~2026-06-21 (Altura insolvency). MYRMIDONS never allocated into the
