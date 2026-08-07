@@ -56,6 +56,21 @@ Re-introspected api.morpho.org/graphql, confirming MNEMON's SCHEMA_NOTES.md:
   bucket-stamped `llama` rows and the hour-floored histories wherever both
   exist.
 
+## market_flows depth (checked 2026-08-07)
+
+- `market_flows` is COMPLETE event history since 2025-04-25, 150 markets:
+  Supply/Withdraw/Borrow/Repay/SupplyCollateral/WithdrawCollateral/
+  Liquidation per account per tx, with repaid/seized/bad_debt_assets.
+  Borrower positions at any historical ts are reconstructable from flows
+  (the hourly `positions` snapshots with API health factors only start
+  2026-07-09).
+- Realized bad debt across ALL HyperEVM liquidations ≈ $185 total (157
+  events, largest USH/sUSDe ≈ $153, rest dust). AVLT appears NOWHERE in the
+  bad-debt log: the frozen 1.0945 NAV keeps liquidations from ever
+  triggering, so the one real loss is unrealized by construction. The
+  recorded bad-debt metric is blind to exactly the assertion-oracle failure
+  mode — state this in the census conclusion.
+
 ## AVLT depeg facts (anchor for lane 3)
 
 - Depeg ~2026-06-21 (Altura insolvency). MYRMIDONS never allocated into the
