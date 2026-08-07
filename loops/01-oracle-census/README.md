@@ -76,11 +76,11 @@ two-sided-stable: features to model, not alerts.
 
 The AVLT anatomy: borrows accelerated *into* the depeg (4.2M USDT0 the week
 of 2026-06-21 — depositing NAV-marked collateral and borrowing against it was
-the rational exit); ~7.5M of 9.8M supplied USDT0 escaped in a four-week
+the rational exit); 7.5M of 9.8M supplied USDT0 escaped in a four-week
 supply/repay rotation; 2.2M remains trapped at 100% utilization against
 collateral the oracle marks at 1.0945 and the market prices near 0.10–0.25.
 Recorded bad debt on the whole chain, all time: 157 events, ≈ $185. The AVLT
-hole (~$1.5–2M economic) does not appear in it, because the frozen oracle
+hole ($1.5–2M economic) does not appear in it, because the frozen oracle
 prevents the liquidations that would record it.
 
 ## Conclusion
