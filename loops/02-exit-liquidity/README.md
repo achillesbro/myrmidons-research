@@ -123,86 +123,125 @@ in two classes — capacity-consuming (non-IKR withdrawals) and in-kind
 The optional permutation test of book-HHI against spell duration is cut from
 this run (budget). See the loop CLAUDE.md.
 
-## Result
+## Results
 
-Census. The data holds 3,073 blocked spells (u ≥ 0.999) across 64 markets;
-7 are open at the snapshot. The 0.99 sensitivity tier holds 3,520 spells.
-The two tiers almost coincide: markets sit either below 0.99 or at 1.0, with
-almost nothing between. Pooled over all spells, the median resolved block
-lasts 10 minutes and the p90 lasts 12 hours. Kaplan-Meier S(24h) = 5.2% and
-S(168h) = 0.7%. The longest resolved block lasted 61.8 days. Era
-stratification confirms the visibility floor, not a regime change:
+The results appear in the order the lanes ran. Each finding states what we
+measured, what the numbers say, and what question it opens for the next
+lane. All numbers come from `notebook.ipynb`; the charts are saved by the
+notebook into `assets/`.
+
+### Finding 1 — Blocks are frequent, usually short, with a heavy tail
+
+The data holds 3,073 blocked spells (u ≥ 0.999) across 64 markets; 7 are
+open at the snapshot. The 0.99 sensitivity tier holds 3,520 spells. The two
+tiers almost coincide: markets sit either below 0.99 or at 1.0, with almost
+nothing between. Pooled over all spells, the median resolved block lasts 10
+minutes and the p90 lasts 12 hours. Kaplan-Meier S(24h) = 5.2% and
+S(168h) = 0.7%. The longest resolved block lasted 61.8 days.
+
+![Kaplan-Meier survival of blocked-exit spells](assets/km_survival.png)
+
+Era stratification confirms the visibility floor, not a regime change:
 backfill-era spells show S(1h) = 43.6% against 7.9% live-era. Hourly
 sampling cannot see sub-hour spells, so the backfill-era distribution shifts
 right by construction. The live-era curve is the truer picture of short
 blocks. One market's survival numbers are lower bounds (its largest
-observation is censored); the census table flags it.
+observation is censored); the census table in the notebook flags it.
 
-Occupancy. 65 markets have priced availability history. The median market
-sits below $10k available liquidity 30.0% of the time (quartiles 7.8% and
-57.2%), below $1k 7.7% of the time, and below $100k 72.2% of the time. The
-extreme is a kHYPE/USDT0 market below $10k for 100% of its history. For a
-lender of any real size, the practical exit window is much narrower than
-the blocked-spell numbers alone suggest.
+Reading: a block is not rare and is usually survivable. The risk sits in the
+tail. This opens two questions. How much room does a lender of real size
+have below the blocked tier (finding 2)? And what force ends a block
+(finding 3)?
 
-Resolution anatomy. Of 3,066 resolved spells: 53% end in new supply, 21% in
-repayment, 2% in liquidation, 1% mixed. The remaining 23% show no
-attributable loan-side flow in the terminal window. This residual is
-consistent with knife-edge utilization ticks at the 0.999 boundary; the loop
-notes record the hypothesis, and this loop does not resolve it. The live-era
-mix is starker: 71% new_supply against 3.5% repay. Blocked doors reopen
-because new money arrives. They almost never reopen because borrowers leave.
-The IRM-as-pump effect is small at the median (rate multiple 1.011 at
+### Finding 2 — For a lender of size, the door is narrower than the spells show
+
+65 markets have priced availability history. The median market sits below
+$10k available liquidity 30.0% of the time (quartiles 7.8% and 57.2%),
+below $1k 7.7% of the time, and below $100k 72.2% of the time. The extreme
+is a kHYPE/USDT0 market below $10k for 100% of its history.
+
+![Occupancy below $10k available liquidity](assets/occupancy_below_10k.png)
+
+Reading: the blocked-spell count understates exit risk for any position of
+real size. A market can stay formally unblocked and still offer less room
+than one position needs, for most of its life. Position size against
+available liquidity is a different, tighter constraint than the u ≥ 0.999
+tier.
+
+### Finding 3 — New money reopens the door; borrowers almost never do
+
+Of 3,066 resolved spells: 53% end in new supply, 21% in repayment, 2% in
+liquidation, 1% mixed. The remaining 23% show no attributable loan-side flow
+in the terminal window. This residual is consistent with knife-edge
+utilization ticks at the 0.999 boundary; the loop notes record the
+hypothesis, and this loop does not resolve it.
+
+![What ends a blocked spell](assets/mechanism_mix.png)
+
+The live-era mix is starker: 71% new_supply against 3.5% repay. The
+IRM-as-pump effect is small at the median (rate multiple 1.011 at
 resolution, p75 1.041) because most spells resolve within hours. The tail is
 real (maximum multiple 37×). The ratchet does its work only on the blocks
 that last.
 
-Door concentration. The withdrawal HHI during blocked spells has median 1.0
-and p25 1.0. In at least three quarters of spells with any
-capacity-consuming withdrawal, every withdrawn coin left through one
-account. The lender book at spell start is nearly as concentrated (median
-HHI 0.974, median 9 lenders). The books are vault-intermediated. The door
-belongs to whoever runs the vault. In-kind redemptions are negligible
-chain-wide (0.74% of gross Supply/Withdraw volume) with one exception:
-AVLT/USDT0, where 87.6% of spell-window withdrawal volume was in-kind (45.9M
-transferred against 6.5M capacity-consuming). The post-depeg "exit" was
-mostly exposure transfer, not exit.
+Reading: blocked doors reopen because new money arrives. They almost never
+reopen because borrowers leave. The protocol's own pump (the rate ratchet)
+only matters on long blocks. So the exit option of a lender depends on the
+market's power to attract deposits. That power is a property of the market
+and its curators — which raises finding 4: who actually stands at the door?
 
-Reconstruction cross-check. Flow-reconstructed books match the
-supplier_positions snapshots within 1% maximum share difference for five of
-eight checked markets, and within 10% for two more. The one material
-divergence (UBTC/USDT0, 0.67 maximum share difference) is attribution, not
-data loss. `market_flows` credits the transaction caller. Positions accrue
-to `onBehalf`, which the flows API does not expose. A router that supplied
-and withdrew 447M near-net-zero across 17 markets absorbs the book that
-belongs to its users. Reconstructed books are therefore caller books. They
-are correct exactly where caller = owner — the vault-dominated norm on this
-chain, which is why the other checks pass. The within-spell withdrawal HHI
-is caller-level for the same reason. The router is material in two markets
-(UETH/USDT0 at 73% of spell-window withdrawals, PT-hbUSDT-18DEC2025 at 20%).
-In those two, HHI = 1.0 overstates owner-level concentration. Everywhere
-else the single withdrawing account is a vault, and the concentration
-reading is genuine.
+### Finding 4 — One account owns the door
+
+The withdrawal HHI during blocked spells has median 1.0 and p25 1.0. In at
+least three quarters of spells with any capacity-consuming withdrawal, every
+withdrawn coin left through one account. The lender book at spell start is
+nearly as concentrated (median HHI 0.974, median 9 lenders). The books are
+vault-intermediated. The door belongs to whoever runs the vault. In-kind
+redemptions are negligible chain-wide (0.74% of gross Supply/Withdraw
+volume) with one exception: AVLT/USDT0, where 87.6% of spell-window
+withdrawal volume was in-kind (45.9M transferred against 6.5M
+capacity-consuming). The post-depeg "exit" was mostly exposure transfer, not
+exit.
+
+Reading: exit is not a shared resource under stress. It is a queue of one or
+two doors, and the doors are curators.
+
+### Finding 5 — Caveat: books and withdrawal HHI are caller-level
+
+Flow-reconstructed books match the supplier_positions snapshots within 1%
+maximum share difference for five of eight checked markets, and within 10%
+for two more. The one material divergence (UBTC/USDT0, 0.67 maximum share
+difference) is attribution, not data loss. `market_flows` credits the
+transaction caller. Positions accrue to `onBehalf`, which the flows API does
+not expose. A router that supplied and withdrew 447M near-net-zero across 17
+markets absorbs the book that belongs to its users. Reconstructed books are
+therefore caller books. They are correct exactly where caller = owner — the
+vault-dominated norm on this chain, which is why the other checks pass. The
+router is material in two markets (UETH/USDT0 at 73% of spell-window
+withdrawals, PT-hbUSDT-18DEC2025 at 20%). In those two, HHI = 1.0 overstates
+owner-level concentration. Everywhere else the concentration reading is
+genuine.
 
 ## Conclusion
 
-On HyperEVM, a blocked exit is a frequent and usually short event with a
-thin, consequential tail. The median block resolves within minutes. Only one
-in twenty outlasts a day. The blocks that persist are the ones where the IRM
-ratchet — the protocol's only endogenous pump — needs days to work, and the
-longest ran two months. Borrowers almost never reopen the door: in the
-live-sampled era, 71% of resolutions arrive as new supply against 3.5% as
-repayment. Exit liquidity on this chain is other people's entrance. A
-lender's true exit option is the market's ability to keep attracting
-deposits, not any behavior of its debtors. The door itself is singular. In
-at least three quarters of blocked spells, every withdrawn coin left through
-one account, and the lender books behind them are vault-owned
-near-monopolies. For a depositor, the practical question is not "can this
-market be exited". It is "does my curator reach the door first". The one
-market where exits took another route (AVLT, 88% in-kind) transferred
-exposure instead of ending it. For HEGEMON the operational reading is
-direct. Utilization thresholds identify blocks after the fact. The risk that
-matters is standing in a single-door queue. Position size relative to
-available liquidity — the median market offers less than $10k of it 30% of
-the time — and relative to the other lender behind the same door is the
-exit-risk variable worth engineering against.
+The conclusion follows from the findings above. From finding 1: a blocked
+exit is a frequent and usually short event with a thin, consequential tail —
+the median block resolves within minutes, one in twenty outlasts a day, and
+the longest ran two months. From finding 3: borrowers almost never reopen
+the door (71% of live-era resolutions arrive as new supply against 3.5% as
+repayment), and the IRM ratchet only matters on the blocks that last. Exit
+liquidity on this chain is other people's entrance. A lender's true exit
+option is the market's power to keep attracting deposits, not any behavior
+of its debtors. From finding 4: the door itself is singular — in at least
+three quarters of blocked spells, every withdrawn coin left through one
+account, and the lender books behind them are vault-owned near-monopolies
+(caller-level, per finding 5, genuine outside two router-heavy markets). For
+a depositor, the practical question is not "can this market be exited". It
+is "does my curator reach the door first". The one market where exits took
+another route (AVLT, 88% in-kind) transferred exposure instead of ending it.
+For HEGEMON the operational reading combines findings 1, 2 and 4.
+Utilization thresholds identify blocks after the fact. The risk that matters
+is standing in a single-door queue. Position size relative to available
+liquidity — the median market offers less than $10k of it 30% of the time —
+and relative to the other lender behind the same door is the exit-risk
+variable worth engineering against.

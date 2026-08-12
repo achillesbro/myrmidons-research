@@ -42,6 +42,15 @@ narration, no conversational asides; those go in the loop's CLAUDE.md as they
 are found. Write READMEs and other external docs in ASD-STE100 simplified
 technical English: short sentences, one idea per sentence, active voice, no
 metaphors or idioms. Owner-verbatim text (loop questions) stays verbatim.
+
+The Results section is a narrative, not a summary. Present each lane's
+numbers in the order the lanes run. Interpret each result before the next
+lane builds on it. State the question each result raises and which lane
+answers it. Embed charts: the notebook saves every figure to the loop's
+`assets/` directory (committed), and the README references them — charts
+never come from outside the notebook. The Conclusion must follow visibly
+from the numbered findings.
+
 `data/` is gitignored — the rsync target for the VPS snapshot (see README).
 
 ## Commands
