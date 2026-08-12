@@ -73,10 +73,31 @@ deviation from the drafted window, same 2h-tolerance spirit.
   capacity) — loop 01's "matched supply/withdraw rotations" formalized: the
   post-depeg exit was exposure transfer via same-tx pairs, not exits.
 - Cross-check outlier: 0xa24d04c3 (UBTC/USDT0) reconstruction vs snapshot
-  max share diff 0.67 — MATERIAL, unexplained. Other 7 markets <= 10%, five
-  <= 1%. Candidate causes: onBehalf attribution in flows vs position owner,
-  or share transfers invisible to loan-side flows. Needs its own look before
-  trusting per-account books on that market.
+  max share diff 0.67 — MATERIAL. Diagnosed 2026-08-10, see next section.
 - IRM pump median multiple 1.011 — the ratchet barely moves for typical
   (short) spells; max 37x on the long tail. The "pump" narrative only
   applies to blocks that already lasted days.
+
+## 0xa24d04c3 cross-check diagnosis (2026-08-10): caller vs owner
+
+- `market_flows.account` is the API's `user.address` on the transaction —
+  the CALLER — while positions accrue to `onBehalf`, which the
+  marketTransactions surface does not expose. Flow-reconstructed books are
+  therefore CALLER books, correct only where caller == owner.
+- The 0.67 outlier account 0x53a333e5... is a router/bundler: 129,555 events
+  across 17 markets, 447.2M supplied vs 446.8M withdrawn (net ~= 0). It
+  holds 67% of the reconstructed UBTC/USDT0 book and 0% of the snapshot;
+  the snapshot's two real owners (0xaa7d..., 49%; 0xb47f..., 41%) have
+  almost no flow events under their own address — the router acted for them.
+- Why 7 of 8 markets still matched: V1 vaults call supply/withdraw
+  themselves, so caller == owner for vault-dominated books — the norm on
+  this chain. The failure mode is router-mediated retail flow.
+- Impact on lane 3: within-spell withdrawal HHI is caller-level. The router
+  exceeds 5% of spell-window withdrawals in only 5 of 64 markets and is
+  material in two (UETH/USDT0 73%, PT-hbUSDT-18DEC2025 20%) — for those,
+  HHI = 1.0 overstates owner-level concentration (one caller, many users).
+  Everywhere else the single withdrawing account is a vault, and the
+  concentration reading is genuine.
+- Fix upstream if owner-level books ever matter: the API's positions
+  surfaces (marketPositions / supplier_positions) are owner-keyed; flows are
+  caller-keyed. There is no onBehalf in marketTransactions to re-key on.

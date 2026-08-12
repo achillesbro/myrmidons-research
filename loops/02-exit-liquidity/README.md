@@ -122,8 +122,6 @@ this run (budget); see the loop CLAUDE.md.
 
 ## Result
 
-DRAFT — owner review.
-
 Census. 3,073 blocked spells (u ≥ 0.999) across 64 markets over the full
 history; 7 open at the snapshot. The 0.99 sensitivity tier holds 3,520 spells
 — the two tiers nearly coincide, so pinning is bimodal: markets sit either
@@ -161,13 +159,40 @@ transfer, not exit.
 
 Reconstruction cross-check. Flow-reconstructed books match the
 supplier_positions snapshots within 1% max share difference for five of
-eight checked markets and within 10% for two more; one market (UBTC/USDT0,
-0xa24d04c3) diverges materially (0.67 max share difference) and is flagged
-unexplained in the loop notes.
+eight checked markets and within 10% for two more. The one material
+divergence (UBTC/USDT0, 0.67 max share difference) is attribution, not data
+loss: `market_flows` credits the transaction caller while positions accrue
+to `onBehalf`, which the flows API does not expose — a router that supplied
+and withdrew 447M near-net-zero across 17 markets absorbs the book that
+belongs to its users. Reconstructed books are therefore caller books,
+correct exactly where caller = owner — the vault-dominated norm on this
+chain, which is why the other checks pass. Consequently the within-spell
+withdrawal HHI is caller-level: the router is material in two markets
+(UETH/USDT0 at 73% of spell-window withdrawals, PT-hbUSDT-18DEC2025 at 20%),
+where HHI = 1.0 overstates owner-level concentration; elsewhere the single
+withdrawing account is a vault and the concentration reading is genuine.
 
 Size-conditional occupancy is omitted pending
 `TODO(metron): add occupancy_below(series, thresholds)`.
 
 ## Conclusion
 
-TODO(owner)
+On HyperEVM, a blocked exit is a frequent, usually brief event with a thin
+but consequential tail: the median block resolves within minutes and only
+one in twenty outlasts a day, yet the spells that do persist are the ones
+where the IRM ratchet — the protocol's only endogenous pump — needs days to
+work, and the longest ran two months. What reopens the door is almost never
+the borrowers: in the live-sampled era 71% of resolutions arrive as new
+supply against 3.5% as repayment, so exit liquidity on this chain is other
+people's entrance, and a lender's true exit option is the market's ability
+to keep attracting deposits rather than any behavior of its debtors. The
+door itself is singular — in at least three quarters of blocked spells every
+withdrawn coin left through one account, and the lender books behind them
+are vault-owned near-monopolies — so for a depositor the practical question
+is not "can this market be exited" but "does my curator reach the door
+first"; the one market where exits happened another way (AVLT, 88% in-kind)
+transferred exposure rather than ending it. For HEGEMON the operational
+reading is direct: utilization thresholds identify blocks after the fact,
+but the risk that matters is standing in a single-door queue — position size
+relative to available liquidity, and to the other lender behind the same
+door, is the exit-risk variable worth engineering against.
