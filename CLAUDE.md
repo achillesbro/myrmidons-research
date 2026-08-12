@@ -39,8 +39,10 @@ one-paragraph conclusion), `manifest.json`, `notebook.ipynb`, and `CLAUDE.md`
 (working notes). Numbered in order started; never renumber. The README reads
 like a methodology paper — no dated observations, no "verified on ..."
 narration, no conversational asides; those go in the loop's CLAUDE.md as they
-are found. `data/` is gitignored — the rsync target for the VPS snapshot (see
-README).
+are found. Write READMEs and other external docs in ASD-STE100 simplified
+technical English: short sentences, one idea per sentence, active voice, no
+metaphors or idioms. Owner-verbatim text (loop questions) stays verbatim.
+`data/` is gitignored — the rsync target for the VPS snapshot (see README).
 
 ## Commands
 
