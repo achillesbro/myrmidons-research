@@ -118,3 +118,32 @@ deviation from the drafted window, same 2h-tolerance spirit.
 - READMEs of both loops rewritten in ASD-STE100-style simplified technical
   English per owner instruction (short sentences, active voice, no
   metaphors). Loop-02 question kept verbatim (owner's words, per spec).
+
+## Door identity + utilization occupancy (2026-08-10, owner request)
+
+- MNEMON's `vaults` dimension (added upstream in b1cd3cd, AFTER the morning
+  rsync) ships vault names — synced into data/vaults/ as a targeted pull
+  (dimension only; market data untouched, so loop-01 outputs stay valid).
+  Manifest tables += vaults. An earlier API-fetched vault_names.json asset
+  was deleted in favor of the dimension. Eloi corrected the "names aren't
+  in MNEMON" claim — check the store first, again.
+- Doors resolved: 31/62 to tracked vaults; Felix 24 (Frontier 7, USDT0 6,
+  HYPE 5, USDhl 4, USDC 2), Gauntlet 7. Owner's guess (Felix) confirmed —
+  USDT0 family, not USDC/WHYPE. Door share of spell-window withdrawals
+  0.48–1.00. Largest unresolved door 0xe5add968... = Hyperithm USDT0 per
+  the Morpho API (not in the vaults dim yet — upstream discovery gap worth
+  closing in MNEMON).
+- FINDING-5 REVISION: 0x53a333e5... (the cross-check outlier, previously
+  called a "router") is Gauntlet USDT0 Vault. A V1 vault transacts as
+  itself, so the 0.67 book divergence is NOT onBehalf attribution — it is
+  reconstruction drift: net = tiny difference of ±447M gross, and per-event
+  share conversion compounds ratio drift over 129,555 events into phantom
+  net shares. Books: fine for low-turnover lenders, drift-prone for
+  high-turnover vaults. Withdrawal HHI unaffected (gross sums, no
+  conversion). The old "router-heavy markets" HHI qualification dissolves —
+  those doors are the Gauntlet vault itself, strengthening finding 4.
+- Utilization occupancy (time_at_utilization, 9900/9990 bps, LEAST(u,1.0)
+  at extraction): median market pinned >0.99 3.6% of time; tail AVLT 49%,
+  RLP/USR 40%, PT-hbUSDT 27%. Pinned and thin are near-independent axes
+  (see assets/stuckness_axes.png): kHYPE/USDT0 thin 100% / pinned 18%;
+  wstHYPE/USDe thin 94% / pinned 4%.

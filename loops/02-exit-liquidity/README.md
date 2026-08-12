@@ -153,20 +153,33 @@ tail. This opens two questions. How much room does a lender of real size
 have below the blocked tier (finding 2)? And what force ends a block
 (finding 3)?
 
-### Finding 2 — For a lender of size, the door is narrower than the spells show
+### Finding 2 — Stuckness has two axes: pinned and thin
 
-65 markets have priced availability history. The median market sits below
-$10k available liquidity 30.0% of the time (quartiles 7.8% and 57.2%),
-below $1k 7.7% of the time, and below $100k 72.2% of the time. The extreme
-is a kHYPE/USDT0 market below $10k for 100% of its history.
+We read the same stuckness twice. First in utilization: METRON
+`time_at_utilization` gives the time-weighted share of time above u = 0.99
+and 0.999. The median market is pinned above 0.99 only 3.6% of the time,
+but the tail is heavy: AVLT 49%, RLP/USR 40%, PT-hbUSDT-18DEC2025 27%.
+Second in dollars: 65 markets have priced availability history. The median
+market sits below $10k available liquidity 30.0% of the time (quartiles
+7.8% and 57.2%), below $1k 7.7% of the time, and below $100k 72.2% of the
+time.
 
 ![Occupancy below $10k available liquidity](assets/occupancy_below_10k.png)
 
+The two axes are close to independent:
+
+![Two axes of stuckness](assets/stuckness_axes.png)
+
+One kHYPE/USDT0 market is below $10k for 100% of its history but pinned
+only 18% of it. wstHYPE/USDe is thin 94% of the time and pinned 4% of it.
+AVLT and RLP/USR sit alone on the pinned axis.
+
 Reading: the blocked-spell count understates exit risk for any position of
 real size. A market can stay formally unblocked and still offer less room
-than one position needs, for most of its life. Position size against
-available liquidity is a different, tighter constraint than the u ≥ 0.999
-tier.
+than one position needs, for most of its life. Pinned and thin are
+different failure modes and need different guards: the u ≥ 0.999 tier
+catches the first, position size against available liquidity catches the
+second.
 
 ### Finding 3 — New money reopens the door; borrowers almost never do
 
@@ -203,24 +216,42 @@ withdrawal volume was in-kind (45.9M transferred against 6.5M
 capacity-consuming). The post-depeg "exit" was mostly exposure transfer, not
 exit.
 
-Reading: exit is not a shared resource under stress. It is a queue of one or
-two doors, and the doors are curators.
+The doors have names. We resolve the top capacity-consuming withdrawal
+account per market against the `vaults` dimension: 31 of 62 markets with
+spell-window withdrawals resolve to a tracked vault, and Felix vaults hold
+24 of those 31 doors (Felix USDT0 Frontier 7, Felix USDT0 6, Felix HYPE 5,
+Felix USDhl 4, Felix USDC 2); Gauntlet vaults hold the other 7. The top
+door takes between 48% and 100% of a market's spell-window withdrawals.
+The largest unresolved door is Hyperithm USDT0 per the Morpho API (the
+`vaults` dimension does not track it yet; see the loop CLAUDE.md).
 
-### Finding 5 — Caveat: books and withdrawal HHI are caller-level
+Reading: exit is not a shared resource under stress. It is a queue of one or
+two doors, the doors are curators, and on this chain the curator is usually
+a Felix or Gauntlet vault.
+
+### Finding 5 — Caveat: reconstructed books drift for high-turnover accounts
 
 Flow-reconstructed books match the supplier_positions snapshots within 1%
 maximum share difference for five of eight checked markets, and within 10%
 for two more. The one material divergence (UBTC/USDT0, 0.67 maximum share
-difference) is attribution, not data loss. `market_flows` credits the
-transaction caller. Positions accrue to `onBehalf`, which the flows API does
-not expose. A router that supplied and withdrew 447M near-net-zero across 17
-markets absorbs the book that belongs to its users. Reconstructed books are
-therefore caller books. They are correct exactly where caller = owner — the
-vault-dominated norm on this chain, which is why the other checks pass. The
-router is material in two markets (UETH/USDT0 at 73% of spell-window
-withdrawals, PT-hbUSDT-18DEC2025 at 20%). In those two, HHI = 1.0 overstates
-owner-level concentration. Everywhere else the concentration reading is
-genuine.
+difference) sits on one account, and the `vaults` dimension identifies it:
+Gauntlet USDT0 Vault, which supplied and withdrew 447M near-net-zero across
+17 markets. A V1 vault transacts as itself, so this is not a caller-vs-owner
+attribution problem. It is reconstruction drift. The account's true net
+position is the small difference of two very large gross flows, and the
+per-event share conversion (assets × shares/assets ratio at event time)
+compounds ratio drift across 129,555 events into phantom net shares.
+
+The consequence is precise. Book HHI at spell start is reliable for
+low-turnover lenders — the normal case, which is why the other checks pass —
+and unreliable where a high-turnover vault dominates the book. The
+withdrawal HHI is unaffected: it sums gross amounts inside one window and
+uses no share conversion. Two earlier qualifications also dissolve: the
+"router" that did 73% of UETH/USDT0 and 20% of PT-hbUSDT spell-window
+withdrawals is the Gauntlet vault itself — a genuine single door, not an
+aggregator hiding many users. `market_flows` still credits the transaction
+caller and not `onBehalf`, so caller-vs-owner remains a structural limit of
+flow data; it is just not what the measured divergence was.
 
 ## Conclusion
 
@@ -232,16 +263,19 @@ the door (71% of live-era resolutions arrive as new supply against 3.5% as
 repayment), and the IRM ratchet only matters on the blocks that last. Exit
 liquidity on this chain is other people's entrance. A lender's true exit
 option is the market's power to keep attracting deposits, not any behavior
-of its debtors. From finding 4: the door itself is singular — in at least
-three quarters of blocked spells, every withdrawn coin left through one
-account, and the lender books behind them are vault-owned near-monopolies
-(caller-level, per finding 5, genuine outside two router-heavy markets). For
-a depositor, the practical question is not "can this market be exited". It
-is "does my curator reach the door first". The one market where exits took
+of its debtors. From finding 4: the door itself is singular and it has a
+name — in at least three quarters of blocked spells, every withdrawn coin
+left through one account, the books behind them are vault-owned
+near-monopolies, and the resolved doors belong to Felix (24 of 31) and
+Gauntlet (7 of 31) vaults. For a depositor, the practical question is not
+"can this market be exited". It is "does my curator reach the door first" —
+and the curator now has a name to watch. The one market where exits took
 another route (AVLT, 88% in-kind) transferred exposure instead of ending it.
 For HEGEMON the operational reading combines findings 1, 2 and 4.
-Utilization thresholds identify blocks after the fact. The risk that matters
-is standing in a single-door queue. Position size relative to available
-liquidity — the median market offers less than $10k of it 30% of the time —
-and relative to the other lender behind the same door is the exit-risk
-variable worth engineering against.
+Utilization thresholds identify blocks after the fact, and finding 2 shows
+pinned and thin are near-independent axes: a market can be thin for most of
+its life without ever pinning. The risk that matters is standing in a
+single-door queue behind a named competitor. Position size relative to
+available liquidity — the median market offers less than $10k of it 30% of
+the time — and relative to the Felix or Gauntlet vault behind the same door
+is the exit-risk variable worth engineering against.
