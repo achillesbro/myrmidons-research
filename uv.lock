@@ -1198,8 +1198,8 @@ wheels = [
 
 [[package]]
 name = "myrmidons-metron"
-version = "1.1.0"
-source = { git = "ssh://git@github.com/achillesbro/METRON.git?tag=v1.1.0#dfc5d768a80235b7466f3e3706a3687c1ca40742" }
+version = "1.2.0"
+source = { git = "ssh://git@github.com/achillesbro/METRON.git?tag=v1.2.0#d803d4c0753a35672bcc5c895ae1d73cdda6379a" }
 dependencies = [
     { name = "numpy" },
     { name = "pandas" },
@@ -1229,7 +1229,7 @@ requires-dist = [
     { name = "duckdb" },
     { name = "jupyter" },
     { name = "matplotlib" },
-    { name = "myrmidons-metron", git = "ssh://git@github.com/achillesbro/METRON.git?tag=v1.1.0" },
+    { name = "myrmidons-metron", git = "ssh://git@github.com/achillesbro/METRON.git?tag=v1.2.0" },
     { name = "pandas" },
     { name = "pyarrow" },
 ]
