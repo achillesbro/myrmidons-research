@@ -6,8 +6,8 @@ When a lender wants out of a HyperEVM market, how long does the wait last,
 what ends it, and who owns the door?
 
 Scope: every tracked HyperEVM market with utilization history. This is a
-census of the whole chain, not a study of pre-selected markets. HEGEMON V1
-history is out of scope (no event sink existed).
+census of the whole chain, not a study of pre-selected markets. Our own
+earlier allocation history is out of scope: no event record of it exists.
 
 ## Data
 
@@ -46,8 +46,8 @@ any size reverts or waits. This matches the pinned_util definition in
 `v_market_health`. The tier u ≥ 0.99 is the near-blocked sensitivity tier.
 Below these tiers, stuckness depends on position size. We measure it as
 occupancy of low-available-liquidity states, not as spells. The 0.92 / 0.95
-tiers of `v_util_spells` are HEGEMON operational thresholds. This loop does
-not use them.
+tiers of `v_util_spells` are operational thresholds for allocation, not
+research tiers. This loop does not use them.
 
 Three lanes, run in sequence. SQL extracts data. METRON computes statistics.
 
@@ -76,8 +76,9 @@ loan-side flows in a terminal window. The drafted window was
 [spell_end − 2h, spell_end]. That window cannot contain the resolving event:
 end_ts is the last sample ABOVE the threshold, so the resolving flow arrives
 between end_ts and the next sample. The window used is
-[end − 2h, min(next_state_ts, end + 2h)]. The loop CLAUDE.md records the
-measurement behind this change.
+[end − 2h, min(next_state_ts, end + 2h)]. The measurement behind this
+change: with the drafted window, 81% of resolved spells show no flow at
+all; with the corrected window, every sampled spell does.
 
 Classification rules, in order of precedence:
 
@@ -100,8 +101,8 @@ them.
 
 IRM-as-exit-pump, for spells classified "repay": we compare
 `rate_at_target` at spell start and spell end (ASOF join on `market_state`)
-and the elapsed time. We report the distribution of rate multiples with
-pandas describe only. Anything beyond that belongs upstream in METRON.
+and the elapsed time. We report the distribution of rate multiples
+descriptively.
 
 ### Lane 3 — Door concentration
 
@@ -120,8 +121,8 @@ Exit-class split, all markets: per spell window, we report withdrawn volume
 in two classes — capacity-consuming (non-IKR withdrawals) and in-kind
 (`is_ikr` pairs) — and the per-market in-kind share across all spells.
 
-The optional permutation test of book-HHI against spell duration is cut from
-this run (budget). See the loop CLAUDE.md.
+A permutation test of book-HHI against spell duration is left for a later
+run.
 
 ## Results
 
@@ -186,8 +187,8 @@ second.
 Of 3,066 resolved spells: 53% end in new supply, 21% in repayment, 2% in
 liquidation, 1% mixed. The remaining 23% show no attributable loan-side flow
 in the terminal window. This residual is consistent with knife-edge
-utilization ticks at the 0.999 boundary; the loop notes record the
-hypothesis, and this loop does not resolve it.
+utilization ticks at the 0.999 boundary — a hypothesis this loop does not
+resolve.
 
 ![What ends a blocked spell](assets/mechanism_mix.png)
 
@@ -222,8 +223,8 @@ spell-window withdrawals resolve to a tracked vault, and Felix vaults hold
 24 of those 31 doors (Felix USDT0 Frontier 7, Felix USDT0 6, Felix HYPE 5,
 Felix USDhl 4, Felix USDC 2); Gauntlet vaults hold the other 7. The top
 door takes between 48% and 100% of a market's spell-window withdrawals.
-The largest unresolved door is Hyperithm USDT0 per the Morpho API (the
-`vaults` dimension does not track it yet; see the loop CLAUDE.md).
+The largest unresolved door is Hyperithm USDT0 per the Morpho API; the
+`vaults` dimension does not track it yet.
 
 Reading: exit is not a shared resource under stress. It is a queue of one or
 two doors, the doors are curators, and on this chain the curator is usually
@@ -271,7 +272,7 @@ Gauntlet (7 of 31) vaults. For a depositor, the practical question is not
 "can this market be exited". It is "does my curator reach the door first" —
 and the curator now has a name to watch. The one market where exits took
 another route (AVLT, 88% in-kind) transferred exposure instead of ending it.
-For HEGEMON the operational reading combines findings 1, 2 and 4.
+For an allocator the operational reading combines findings 1, 2 and 4.
 Utilization thresholds identify blocks after the fact, and finding 2 shows
 pinned and thin are near-independent axes: a market can be thin for most of
 its life without ever pinning. The risk that matters is standing in a

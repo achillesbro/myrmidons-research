@@ -1,5 +1,11 @@
 # Loop 01 — working notes
 
+## Open upstream items
+
+- TODO(metron): add direction_stats (share of upward moves among changes).
+  The census tabulates it in notebook pandas. Removed from the README for
+  publication (2026-08-10); still open.
+
 ## Retrofit re-run (2026-08-10)
 
 - README restructured to the findings-narrative shape (charts from

@@ -51,6 +51,11 @@ answers it. Embed charts: the notebook saves every figure to the loop's
 never come from outside the notebook. The Conclusion must follow visibly
 from the numbered findings.
 
+READMEs are publication-ready and self-contained. No TODOs, no bot names
+(HEGEMON), no upstream-work notes, no pointers to any CLAUDE.md. Naming
+MNEMON/METRON as the tools used is fine. Every internal reference lives in
+the loop's CLAUDE.md instead.
+
 `data/` is gitignored — the rsync target for the VPS snapshot (see README).
 
 ## Commands

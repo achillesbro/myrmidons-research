@@ -24,8 +24,7 @@ token USD reference prices (`prices`: DeFiLlama with Morpho-API fallback),
 and `market_flows` (complete per-account event history, used by the AVLT
 anatomy). Oracle prices exist on live rows only, from 2026-07; each
 fingerprint uses about five weeks of 5-minute samples. Utilization, supply,
-and borrow extend back to market creation through backfill. The loop
-CLAUDE.md records coverage boundaries and known feed gaps.
+and borrow extend back to market creation through backfill.
 
 The 5-minute snapshots show price changes, not on-chain update events. In
 this loop, "staleness" means a run of unchanged observed prices. The oracle
@@ -43,9 +42,8 @@ Three lanes. SQL extracts data. METRON computes statistics.
 1. **Fingerprint census.** For each market, we take `oracle_price` from
    `v_market_state`. `staleness_stats` measures runs of unchanged price.
    `realized_vol` measures the volatility of oracle log-returns. We tabulate
-   the share of upward moves by hand (`# TODO(metron): add direction_stats`).
-   Output: each market gets one class — market-rate, exchange-rate,
-   NAV-assertion, or PT-decay.
+   the share of upward moves directly in the notebook. Output: each market
+   gets one class — market-rate, exchange-rate, NAV-assertion, or PT-decay.
 2. **Divergence screen.** `deviation_vs_reference` compares the
    oracle-implied collateral/loan ratio to the reference USD-price ratio,
    where reference coverage exists. Persistent divergence indicates
