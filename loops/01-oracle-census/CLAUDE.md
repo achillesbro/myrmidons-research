@@ -1,5 +1,19 @@
 # Loop 01 — working notes
 
+## Retrofit re-run (2026-08-10)
+
+- README restructured to the findings-narrative shape (charts from
+  notebook assets/, reasoning flow, conclusion cites findings). Notebook
+  gained two chart cells (fingerprint scatter, divergence bars) and was
+  re-executed on the 2026-08-10 snapshot; manifest re-stamped (b50c56c,
+  metron v1.2.0). Drift vs the 2026-08-07 run: class counts unchanged
+  (32/14/14/3); AVLT stale stretch 408h -> 477h; hbHYPE freeze 695h -> 764h;
+  NEW hwHLP divergence event 2026-08-09 (max 4.8%, one 27h >=2% spell, was
+  1.6% before); AVLT trapped book GROWING by accrual 2.21M -> 2.49M;
+  liquidations stopped after 2026-07-27 (zero in the last two weeks);
+  median HF 0.539. Chart note: nav/sparse markets with <=10 changes also
+  plot at y=-0.05 next to the frozen ones (both have NaN up_share).
+
 Observations and data-coverage findings that inform the method but don't
 belong in the README (which reads as a methodology paper). Newest last.
 
