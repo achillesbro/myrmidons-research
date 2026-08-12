@@ -101,3 +101,20 @@ deviation from the drafted window, same 2h-tolerance spirit.
 - Fix upstream if owner-level books ever matter: the API's positions
   surfaces (marketPositions / supplier_positions) are owner-keyed; flows are
   caller-keyed. There is no onBehalf in marketTransactions to re-key on.
+
+## Occupancy rerun + fixes (2026-08-10)
+
+- TODO(metron): occupancy_below resolved upstream — METRON v1.2.0 ships it
+  (rule-5 weights, strict below, thresholds in series units). Pin bumped,
+  manifest metron_version now v1.2.0, occupancy block live in the notebook.
+- Headline join bug found during the rerun: three distinct kHYPE/USD₮0
+  markets share a display name; name-keyed joins duplicated rows (occupancy)
+  and silently blended per-market mechanism mixes (mech_mix, market_doors)
+  in the earlier committed run. All headline aggregation now keys on
+  market_id; names are display-only. Pooled numbers were never affected.
+- Occupancy headline: median market below $10k available 30.0% of the time
+  (p25 7.8%, p75 57.2%); below $1k 7.7%; below $100k 72.2%; one kHYPE/USDT0
+  market below $10k for 100% of its history.
+- READMEs of both loops rewritten in ASD-STE100-style simplified technical
+  English per owner instruction (short sentences, active voice, no
+  metaphors). Loop-02 question kept verbatim (owner's words, per spec).
