@@ -4,7 +4,9 @@ Per ``v_dex_slippage`` cycle and per market: build the pair's slippage
 ladder, derive the max tolerable slippage from the market's LLTV
 (``mrsearch.protocol``), call ``metron.liquidation_capacity``, add HyperCore
 bid depth for collaterals with a Core spot book, and append one row per
-(as_of, market, model_version) to the outputs namespace.
+(as_of, market, model_version) to the outputs namespace. ``capacity_ratio``
+divides the debt-clearing equivalent (``capacity_total / LIF``) by
+outstanding borrow.
 
 V1 assumptions, declared in each row's ``params``: naive additivity of DEX
 route capacity and Core book depth; Core mid treated as equivalent to the
@@ -32,11 +34,13 @@ from mrsearch.protocol import lif_from_lltv, max_slippage_threshold
 
 HAIRCUT_DEFAULT = 0.005
 
-# Which HyperEVM collateral symbols have a HyperCore spot book (the
-# `core_assets` dimension holds Core coin names, not EVM addresses).
-# Wrapped/staked variants (kHYPE, wstHYPE, beHYPE) deliberately do NOT map:
-# their Core book is not the same asset. V1 venue knowledge, owned here.
-CORE_COIN_BY_SYMBOL = {"WHYPE": "HYPE", "UBTC": "UBTC", "UETH": "UETH"}
+# Which HyperEVM collateral symbols have a HyperCore spot book OF THE SAME
+# ASSET (the `core_assets` dimension holds Core coin names, not EVM
+# addresses). kHYPE maps to its own KHYPE/USDC book — thin, which the model
+# then measures instead of assuming; it never maps to the HYPE book
+# (Kinetiq redemption runs a multi-day queue, not liquidation timescale).
+# wstHYPE, beHYPE and PT tokens have no Core book and do not map.
+CORE_COIN_BY_SYMBOL = {"WHYPE": "HYPE", "UBTC": "UBTC", "UETH": "UETH", "kHYPE": "KHYPE"}
 
 # A Core book older than this is not used (stale depth would inflate capacity).
 CORE_BOOK_MAX_AGE = pd.Timedelta(hours=24)
@@ -125,7 +129,10 @@ def build_rows(
 
         capacity_total = capacity_evm + capacity_core
         borrow = None if pd.isna(m.borrow_usd) else float(m.borrow_usd)
-        ratio = capacity_total / borrow if borrow else None
+        # capacity is SELL-SIDE collateral notional; clearing debt D sells
+        # LIF * D of collateral, so the ratio compares debt-clearing
+        # equivalent (capacity / LIF) to debt.
+        ratio = capacity_total / lif / borrow if borrow else None
 
         params = {
             "haircut": haircut,

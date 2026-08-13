@@ -86,7 +86,9 @@ def test_interior_crossing_market(rows: list[dict]) -> None:
     assert a["capacity_censored"] is False
     assert a["lif"] == pytest.approx(1.0 / (0.3 * LLTV + 0.7), rel=1e-12)
     assert a["outstanding_borrow_usd"] == 1_000_000.0
-    assert a["capacity_ratio"] == pytest.approx(0.325, rel=1e-9)
+    # ratio divides the debt-clearing equivalent by debt: capacity / LIF /
+    # borrow = 325_000 * 0.975 / 1_000_000 (LIF = 1/0.975 at lltv 11/12).
+    assert a["capacity_ratio"] == pytest.approx(0.316875, rel=1e-9)
 
 
 def test_censored_market_with_core_addon(rows: list[dict]) -> None:
@@ -98,7 +100,8 @@ def test_censored_market_with_core_addon(rows: list[dict]) -> None:
     assert b["capacity_core_usd"] == pytest.approx(300_000.0, rel=1e-9)
     assert b["capacity_total_usd"] == pytest.approx(1_300_000.0, rel=1e-9)
     assert b["capacity_censored"] is True
-    assert b["capacity_ratio"] == pytest.approx(0.65, rel=1e-9)
+    # 1_300_000 * 0.975 / 2_000_000
+    assert b["capacity_ratio"] == pytest.approx(0.63375, rel=1e-9)
 
 
 def test_rows_match_output_contract(rows: list[dict]) -> None:
