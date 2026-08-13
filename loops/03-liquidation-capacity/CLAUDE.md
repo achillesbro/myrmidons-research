@@ -7,9 +7,16 @@ Internal notes; the README is the publication-ready document.
   writer is `mrsearch.liq_capacity`, wired as a daily systemd timer on the
   VPS (liq-capacity.timer, 00:20 UTC); the table accumulates hourly quote
   cycles from here.
-- The kHYPE/WHYPE quoted curve genuinely dips below threshold near $1M
-  (slippage ~3e-6 at $1M after 0.9 at $500k) — LiquidSwap route noise, kept
-  in the chart deliberately as the first-crossing illustration.
+- The kHYPE/WHYPE dip at $1M is diagnosed (2026-08-13, from stored
+  route_json): the router flips between a direct kHYPE/WHYPE RamsesV3 CL
+  pool (unit ~1.0225, used at $100k and $1M) and a kHYPE->USDC->WHYPE
+  LiquidCore route whose USDC leg exhausts at ~$56k (used at $500k and
+  $5M; $10M splits over four dust pools and collapses). Router path search
+  is not monotone in size — the good route existed at $500k and was not
+  selected. Consequences: the $500k rung understates the pair; capacity
+  errs low (conservative); the first-crossing rule is vindicated on real
+  data. If this pattern generalizes, a v2 could quote per-pool books or
+  retry rungs, but only after observing more cycles.
 - CORE_COIN_BY_SYMBOL maps only WHYPE/UBTC/UETH. The kHYPE decision
   (no mapping) is the single most result-shaping call in the loop: with a
   kHYPE → HYPE mapping the chain would look mostly covered. Revisit only

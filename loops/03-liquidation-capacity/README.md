@@ -71,8 +71,11 @@ slippage ladder: sort by size, interpolate linearly, return the first size
 where the curve reaches `x`. Three choices keep the estimate conservative.
 Slippage is convex in size, so the linear chord overestimates slippage
 between rungs and the crossing lands early. The first crossing decides: a
-curve that dips back below the threshold at a larger size (quote noise does
-this) does not reopen capacity. There is no extrapolation: a curve that
+curve that dips back below the threshold at a larger size does not reopen
+capacity. Such dips are real in the data and they are router artifacts, not
+liquidity: the aggregator's path search is not monotone in size, and it can
+pick a worse route at one rung than at the next (the stored `route_json`
+per rung shows which route each quote used). There is no extrapolation: a curve that
 never crosses is right-censored at the largest quoted size and the true
 capacity is at least the reported value (`capacity_censored`).
 
@@ -118,10 +121,17 @@ thresholds:
 Reading: the aggregator's pooled depth, not any market's own parameters,
 sets the DEX-route capacity. Doubling the margin (`x` of 0.108 against
 0.064) buys almost no extra size — the curves are near-vertical where they
-cross. The kHYPE/WHYPE panel shows the first-crossing rule at work: the
-quoted curve dips back under the threshold near $1M, and the model refuses
-to count that region. The wall raises the question finding 2 answers: what
-carries capacity beyond the router?
+cross. The kHYPE/WHYPE panel shows the first-crossing rule at work. The
+quoted curve collapses at $500k, then returns to par at $1M. The stored
+routes explain the dip: at $100k and $1M the router selects a direct
+kHYPE → WHYPE concentrated-liquidity pool at near-zero impact, while at
+$500k and $5M it routes through a kHYPE → USDC leg with about $56k of
+effective depth. The recovery at $1M is the router re-finding a route that
+also existed at $500k, not liquidity appearing at size. The model refuses
+to count the region past the first crossing, which is correct here twice:
+the dip is a search artifact, and if the direct pool truly holds that
+depth, the reported capacity errs low, never high. The wall raises the
+question finding 2 answers: what carries capacity beyond the router?
 
 ### Finding 2 — Where a Core book exists, it is the capacity
 
