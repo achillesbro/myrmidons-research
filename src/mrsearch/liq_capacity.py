@@ -163,15 +163,17 @@ def build_rows(
 
 
 _MARKET_META_SQL = """
+WITH c AS (SELECT ?::TIMESTAMPTZ AS as_of)
 SELECT m.chain_id, m.market_id, m.collateral_token, m.loan_token, m.collateral_symbol,
        m.lltv::DOUBLE / 1e18 AS lltv,
        ms.total_borrow_assets::DOUBLE / POW(10, m.loan_decimals) * p.price_usd AS borrow_usd,
        ms.ts AS state_ts
 FROM markets m
+CROSS JOIN c
 ASOF LEFT JOIN market_state ms
-    ON ms.chain_id = m.chain_id AND ms.market_id = m.market_id AND ms.ts <= ?
+    ON ms.chain_id = m.chain_id AND ms.market_id = m.market_id AND ms.ts <= c.as_of
 ASOF LEFT JOIN prices p
-    ON p.chain_id = m.chain_id AND p.token_address = m.loan_token AND p.ts <= ?
+    ON p.chain_id = m.chain_id AND p.token_address = m.loan_token AND p.ts <= c.as_of
 WHERE m.chain_id = ? AND m.collateral_token IS NOT NULL
 """
 
@@ -207,7 +209,7 @@ def run(
             "FROM v_dex_slippage WHERE ts = ? AND chain_id = ?",
             [as_of, int(c.chain_id)],
         )
-        meta = reader.sql(_MARKET_META_SQL, [as_of, as_of, int(c.chain_id)])
+        meta = reader.sql(_MARKET_META_SQL, [as_of, int(c.chain_id)])
         core = reader.sql(_CORE_DEPTH_SQL, [as_of, as_of - CORE_BOOK_MAX_AGE])
         rows = build_rows(
             as_of, dex, meta, core, haircut=haircut, model_version=model_version
