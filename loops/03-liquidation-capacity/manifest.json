@@ -1,0 +1,14 @@
+{
+  "snapshot_date": "2026-08-13",
+  "mnemon_commit": "621bf45cfaab5aee5330b187979804b775c23629",
+  "metron_version": "v1.3.0",
+  "tables": [
+    "dex_quotes",
+    "core_book_levels",
+    "core_assets",
+    "markets",
+    "market_state",
+    "prices",
+    "outputs/liq_capacity"
+  ]
+}
