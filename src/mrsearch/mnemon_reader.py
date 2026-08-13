@@ -30,7 +30,8 @@ import pandas as pd
 
 
 def _mnemon_modules(repo: str | Path | None) -> tuple[Any, Any, Any]:
-    """Import (ALL_TABLES, Store, create_derived_views) from a local MNEMON checkout."""
+    """Import (register_raw_tables, Store, create_derived_views) from a local
+    MNEMON checkout."""
     repo = repo or os.environ.get("MNEMON_REPO")
     if not repo:
         raise ValueError(
@@ -42,11 +43,11 @@ def _mnemon_modules(repo: str | Path | None) -> tuple[Any, Any, Any]:
         raise ValueError(f"not a MNEMON checkout (no src/mnemon): {repo}")
     if str(src) not in sys.path:
         sys.path.insert(0, str(src))
-    from mnemon.schemas import ALL_TABLES
+    from mnemon.duck import register_raw_tables
     from mnemon.storage import Store
     from mnemon.views import create_derived_views
 
-    return ALL_TABLES, Store, create_derived_views
+    return register_raw_tables, Store, create_derived_views
 
 
 class SnapshotReader:
@@ -65,23 +66,17 @@ class SnapshotReader:
         if not self.data_dir.exists():
             raise FileNotFoundError(f"snapshot data dir not found: {self.data_dir}")
 
-        self._all_tables, store_cls, self._create_views = _mnemon_modules(mnemon_repo)
+        self._register_raw, store_cls, self._create_views = _mnemon_modules(mnemon_repo)
         self._store = store_cls(self.data_dir)
         self._con = duckdb.connect(":memory:")
         self._views: set[str] = set()
         self.available = self._register()
 
     def _register(self) -> set[str]:
-        available: set[str] = set()
-        for spec in self._all_tables.values():
-            if not self._store.has_data(spec):
-                continue
-            hive = ", hive_partitioning = 1" if spec.partitioned else ""
-            self._con.execute(
-                f"CREATE OR REPLACE VIEW {spec.name} AS "
-                f"SELECT * FROM read_parquet('{self._store.parquet_glob(spec)}'{hive})"
-            )
-            available.add(spec.name)
+        # MNEMON's own registration: raw views present the full spec schema
+        # (typed NULLs for columns older day files lack), so the derived
+        # views bind on snapshots of any vintage.
+        available: set[str] = set(self._register_raw(self._con, self._store))
         self._views = set(self._create_views(self._con, available))
         return available
 

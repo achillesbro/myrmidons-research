@@ -1,18 +1,27 @@
 # CLAUDE.md
 
 myrmidons-research is the consumer repo of a three-part stack: MNEMON (Parquet/
-DuckDB archive of Morpho Blue state, the write side), METRON (pure statistical
-metric library), and this repo (research loops, risk-framework work, write-ups).
-Later this becomes the Phase 3 risk-engine repo writing to MNEMON output tables
-— not in this phase.
+DuckDB archive of Morpho Blue state, the ingestion side), METRON (pure
+statistical metric library), and this repo (research loops, risk-framework
+work, write-ups). Since 2026-08-13 it is also the Phase 3 risk-engine repo:
+it computes and writes MNEMON OUTPUT tables (the first is `liq_capacity`).
 
 ## Hard rules
 
 - **Boundary.** This repo imports METRON (git dependency, pinned by tag in
   pyproject.toml). METRON must never import this repo, and nothing here goes
   upstream into it. MNEMON is a data source, not a dependency of record.
-- **Read-only against MNEMON.** Never write Parquet, never open the ingestion's
+- **Read-only against MNEMON ingestion.** Every ingestion table and derived
+  view stays read-only: never write their Parquet, never open the ingestion's
   `mnemon.duckdb`. The reader is an in-memory DuckDB over the `data/` globs.
+- **One write namespace: `<data>/outputs/`.** The risk engine writes MNEMON
+  OUTPUT tables under an `outputs/` prefix inside the store, physically
+  separate from ingestion data. Only `mrsearch.outputs.OutputStore` writes,
+  it resolves every path under that prefix, and nothing here ever writes
+  outside it. MNEMON's ingestion enumerates its own table specs and never
+  scans `outputs/`; `SnapshotReader` never registers output tables. Output
+  tables are APPEND-ONLY: existing keys always win, history is never
+  rewritten, a model change writes new rows under a new `model_version`.
 - **No statistical logic in SQL.** SQL does per-row algebra only (unit scaling,
   joins, filters, resampling keys). Statistics live in METRON. If a metric is
   missing from METRON, do NOT implement it here — leave
@@ -21,6 +30,24 @@ Later this becomes the Phase 3 risk-engine repo writing to MNEMON output tables
   (snapshot_date UTC, mnemon_commit, metron_version, tables) via
   `mrsearch.snapshot.write_manifest` before anything runs. The notebook's first
   cell reads and prints it. A result without a manifest does not count.
+
+## Module map (risk engine)
+
+- `mrsearch/protocol.py` — Morpho Blue algebra (`lif_from_lltv`,
+  `max_slippage_threshold`). Deliberately local: METRON stays
+  protocol-agnostic; these constants come from the contract.
+- `mrsearch/outputs.py` — the outputs namespace: `OutputTable` specs
+  (`LIQ_CAPACITY`) + `OutputStore` (append-only, day-partitioned on `as_of`,
+  atomic tmp+replace, MNEMON-style hive layout).
+- `mrsearch/liq_capacity.py` — orchestration + CLI
+  (`uv run python -m mrsearch.liq_capacity`): per v_dex_slippage cycle and
+  market, build the pair's slippage ladder, x from LLTV and haircut, call
+  `metron.liquidation_capacity`, add interpolated HyperCore bid depth
+  (WHYPE/UBTC/UETH only — staked variants deliberately do not map), append
+  rows keyed (as_of, market_id, model_version). Idempotent: cycles already
+  written under the current model version are skipped. Every row carries
+  `params` + `input_window` JSON so it is recomputable from raw MNEMON
+  inputs months later.
 
 ## MNEMON views: chosen approach
 
