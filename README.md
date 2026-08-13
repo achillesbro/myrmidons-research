@@ -83,10 +83,12 @@ uv run python -m mrsearch.liq_capacity --data data --mnemon-repo ~/mnemon
 ```
 
 The runner is idempotent (cycles already written under the current model
-version are skipped) and cron-friendly. The canonical run happens on the VPS
-after ingestion; a local run against `data/` is a dry computation on a
-snapshot — note that the next `rsync --delete` replaces `data/` (including
-`data/outputs/`) with the VPS state.
+version are skipped) and cron-friendly. The canonical run happens on the VPS:
+a daily systemd timer (`systemd/liq-capacity.timer` -> `run_liq_capacity.sh`,
+00:20 UTC) processes every cycle the ingestion accumulated. A local run
+against `data/` is a dry computation on a snapshot — note that the next
+`rsync --delete` replaces `data/` (including `data/outputs/`) with the VPS
+state, which carries the canonical outputs down.
 
 Output tables are append-only, live only under `outputs/`, and every row
 carries its `model_version`, `params` and `input_window`, so any row can be
