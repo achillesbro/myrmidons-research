@@ -47,6 +47,29 @@ Three caveats set the limits of the data:
 
 ## Method
 
+### What the modeled capacity is
+
+`capacity_total_usd` answers one question: if liquidation had to happen
+now, how many dollars of this market's collateral could a liquidator sell,
+in one transaction, into the liquidity we can observe, before the
+liquidation stops being profitable? Below this size, liquidation is a
+profitable arbitrage and can be expected promptly. Beyond it, every
+additional dollar liquidated loses money, so the remaining debt waits —
+for pool refills, for off-venue buyers, or for a deeper price move that
+re-arms the incentive. `capacity_ratio` states what fraction of the
+market's outstanding debt sits on the profitable side of that line.
+
+The number is deliberately narrow in three ways. It is instantaneous: one
+snapshot of quoted liquidity, no replenishment, so it bounds from below
+what a patient liquidator could clear over hours — and it is exactly the
+binding number when waiting is what hurts (a fast depeg). It is
+market-level: it does not read the health-factor distribution; it is the
+ceiling on profitable clearing whatever the queue of positions looks like.
+And it is supply-side only: it says nothing about whether that much debt
+will need liquidating.
+
+### Derivation
+
 A liquidation is a swap with a subsidy. Morpho Blue pays liquidators a
 liquidation incentive factor set by the market's LLTV:
 
@@ -92,9 +115,15 @@ conservatism direction as the DEX leg.
     capacity_total = capacity_evm + capacity_core
     capacity_ratio = capacity_total / outstanding_borrow
 
-Two v1 assumptions are declared in every row's `params`: additivity of the
-two venues (their standing inventories are distinct, but arbitrage links
-them under stress), and Core mid treated as equivalent to the oracle mark.
+Three v1 simplifications are declared: additivity of the two venues (their
+standing inventories are distinct, but arbitrage links them under stress);
+Core mid treated as equivalent to the oracle mark; and units — capacity is
+SELL-SIDE notional (dollars of collateral sold), while the denominator of
+`capacity_ratio` is debt. Clearing debt D requires selling LIF × D of
+collateral, so the debt-clearing equivalent is capacity / LIF and the
+ratio overstates coverage by 4–15% depending on LLTV. The first two are
+recorded in every row's `params`; the third is a constant of the contract
+and is absorbed by the model's conservatism elsewhere.
 
 Provenance: every row records `model_version` (the METRON tag plus the
 risk-engine commit), `params` (haircut, size grid, interpolation and
