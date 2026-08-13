@@ -102,28 +102,29 @@ per rung shows which route each quote used). There is no extrapolation: a curve 
 never crosses is right-censored at the largest quoted size and the true
 capacity is at least the reported value (`capacity_censored`).
 
-Core-book capacity applies only where the collateral's Core spot book
-trades the same asset: WHYPE → HYPE, UBTC, UETH. Staked and wrapped
-variants (kHYPE, wstHYPE, beHYPE, PT tokens) deliberately do not map — a
-liquidator holding kHYPE cannot sell it on the HYPE book without first
-unstaking, and that path has its own delay and cost. Core capacity is the
+Core-book capacity applies only where a Core spot book trades the
+collateral ITSELF: WHYPE → HYPE, UBTC, UETH, and kHYPE → its own
+KHYPE/USDC book. kHYPE never maps to the HYPE book: the redemption path to
+HYPE (Kinetiq, 0.1% fee) runs a multi-day unstaking queue, which is not a
+liquidation timescale, so the swap routes and the KHYPE book are a
+liquidator's whole exit. wstHYPE, beHYPE and PT tokens have no Core book
+and do not map. Core capacity is the
 cumulative bid-side USD depth within `x` of mid, interpolated linearly
 between the stored bps tiers, anchored at (0, 0) below the first tier and
 clamped at the deepest tier. Both ends understate depth — the same
 conservatism direction as the DEX leg.
 
     capacity_total = capacity_evm + capacity_core
-    capacity_ratio = capacity_total / outstanding_borrow
+    capacity_ratio = (capacity_total / LIF) / outstanding_borrow
 
-Three v1 simplifications are declared: additivity of the two venues (their
-standing inventories are distinct, but arbitrage links them under stress);
-Core mid treated as equivalent to the oracle mark; and units — capacity is
-SELL-SIDE notional (dollars of collateral sold), while the denominator of
-`capacity_ratio` is debt. Clearing debt D requires selling LIF × D of
-collateral, so the debt-clearing equivalent is capacity / LIF and the
-ratio overstates coverage by 4–15% depending on LLTV. The first two are
-recorded in every row's `params`; the third is a constant of the contract
-and is absorbed by the model's conservatism elsewhere.
+The ratio divides by LIF because capacity is sell-side collateral notional:
+clearing debt D seizes and sells LIF × D of collateral, so capacity / LIF
+is the debt-clearing equivalent the denominator compares against.
+
+Two v1 simplifications are declared in every row's `params`: additivity of
+the two venues (their standing inventories are distinct, but arbitrage
+links them under stress), and Core mid treated as equivalent to the oracle
+mark.
 
 Provenance: every row records `model_version` (the METRON tag plus the
 risk-engine commit), `params` (haircut, size grid, interpolation and
@@ -137,13 +138,13 @@ All numbers come from `notebook.ipynb` over the cross-section cycle; the
 charts are saved by the notebook into `assets/`. 65 markets: 57 `ok`, 7
 `no_route`, 1 `no_price`; 64 carry outstanding borrow.
 
-### Finding 1 — The DEX route hits a wall near $60k, whatever the pair
+### Finding 1 — The DEX route walls out two orders of magnitude under the debt
 
-Across markets with a routable pair, DEX capacity clusters tightly: median
-$11k, p75 $53k, p95 $62k. The four largest markets cross their thresholds
-between $55k and $117k, and their slippage curves collapse onto the same
-cliff between $50k and $500k despite different pairs and different
-thresholds:
+Across markets with a routable pair, DEX capacity clusters far below the
+large markets' debt: median $11k, p75 $55k, p95 $134k. The four largest
+markets cross their thresholds between $55k and $154k, and their slippage
+curves collapse onto the same cliff between $50k and $500k despite
+different pairs and different thresholds:
 
 ![Slippage ladders and thresholds](assets/slippage_ladders.png)
 
@@ -159,24 +160,31 @@ effective depth. The recovery at $1M is the router re-finding a route that
 also existed at $500k, not liquidity appearing at size. The model refuses
 to count the region past the first crossing, which is correct here twice:
 the dip is a search artifact, and if the direct pool truly holds that
-depth, the reported capacity errs low, never high. The wall raises the
-question finding 2 answers: what carries capacity beyond the router?
+depth, the reported capacity errs low, never high. The same instability
+moves the wall between cycles — the same pair's crossing shifted by 2x
+from one hour to the next as the router's path choice changed — without
+ever bringing it within reach of the large markets' debt. The wall raises
+the question finding 2 answers: what carries capacity beyond the router?
 
-### Finding 2 — Where a Core book exists, it is the capacity
+### Finding 2 — Where a Core book exists, it is the capacity; kHYPE's holds $3.3k
 
-21 markets have collateral with a Core spot book. For them, the book
-contributes 99.5% of modeled capacity: the HYPE book adds $3.2M and the
-UBTC book $5.7M of tolerable-slippage depth, against DEX legs of $2k–$68k.
-Modeled capacity is, in practice, Core depth wherever Core depth applies.
-That makes the mapping rule the load-bearing assumption — and it raises
-finding 3: most of the chain's debt sits on collateral that does not map.
+29 markets have collateral with a Core spot book, and for them the book
+contributes 98.2% of modeled capacity: the HYPE book adds $3.5M and the
+UBTC book $7.4M of tolerable-slippage depth, against DEX legs of
+$2k–$155k. Modeled capacity is, in practice, Core depth wherever real
+Core depth applies. The counter-case proves the rule: kHYPE maps to its
+own KHYPE/USDC book, and that book holds $3.3k inside the tolerable band —
+a listed pair with no depth. The measurement replaces the earlier
+assumption and changes nothing: kHYPE's exit is the DEX route. This
+raises finding 3: most of the chain's debt sits on collateral whose book
+is absent or empty.
 
 ### Finding 3 — The largest debt stacks are the least covered
 
-The aggregate hides the problem: $99.2M of outstanding borrow against
-$80.4M of modeled capacity reads as ratio 0.8. The distribution inverts it.
-31 of 64 markets clear ratio 1, but they are small. The five largest
-markets hold 83.9% of the chain's debt and their pooled ratio is 0.043.
+The aggregate hides the problem: $99.3M of outstanding borrow against
+$96.3M of modeled capacity reads as near-parity. The distribution inverts
+it. 34 of 64 markets clear ratio 1, but they are small — the five largest
+markets hold 83.8% of the chain's debt and their pooled ratio is 0.051.
 
 ![Capacity against outstanding borrow](assets/capacity_vs_borrow.png)
 
@@ -184,13 +192,13 @@ The composition of the top of the table:
 
 ![Coverage of the twelve largest debt stacks](assets/capacity_ratio_top.png)
 
-- kHYPE markets owe $45.9M — nearly half the chain — at ratios between
-  0.004 and 0.121. kHYPE has no Core mapping (the HYPE book trades a
-  different asset), so its capacity is the $60k DEX wall against
-  eight-figure debt.
-- WHYPE/USDC, the largest single market at $37.8M, reaches only 0.087 even
+- kHYPE markets owe $45.8M — nearly half the chain — and the four largest
+  sit at ratios between 0.008 and 0.028. Their capacity is a ~$120–154k
+  DEX route plus a $3.3k Core book against eight-figure debt; the deep
+  HYPE book does not apply, because unstaking into it takes days.
+- WHYPE/USDC, the largest single market at $37.8M, reaches only 0.090 even
   with the HYPE book: `x = 0.064` caps the usable band of the book at
-  $3.2M.
+  $3.5M.
 - AVLT/USD₮0 owes $2.7M at ratio 0.001: LLTV 0.915 leaves `x = 0.021`, and
   the pair's quoted depth inside that band is $2.3k.
 
@@ -213,12 +221,15 @@ says so instead of guessing.
 The model prices a liquidation as a subsidized swap and asks whether the
 subsidy covers the exit. From finding 1: on the DEX route the answer stops
 depending on the market almost immediately — the router's pooled depth
-walls every pair near $60k, so LLTV-driven margin differences barely move
-capacity. From finding 2: real capacity lives where a Core order book
-trades the collateral itself, and there it is effectively the whole model.
-From finding 3: that mapping fails exactly where the debt is — half the
-chain's borrow sits on staked-HYPE collateral whose book does not apply,
-and the five largest markets are covered at four cents on the dollar. The
+walls every pair two orders of magnitude under the large markets' debt,
+so LLTV-driven margin differences barely move capacity. From finding 2:
+real capacity lives where a Core order book holds real depth in the
+collateral itself, and there it is effectively the whole model — while
+kHYPE's own book, measured, holds $3.3k. From finding 3: depth is absent
+exactly where the debt is — half the chain's borrow sits on staked-HYPE
+collateral whose only liquidation-timescale exits are a ~$150k DEX route
+and that empty book, and the five largest markets are covered at five
+cents on the dollar. The
 practical output for cap sizing is the ratio column and its status flags:
 a market's safe borrow scale is set by its collateral's route to real
 depth, not by its LLTV, and the markets that look deepest by TVL are the

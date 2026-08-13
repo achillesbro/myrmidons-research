@@ -17,10 +17,19 @@ Internal notes; the README is the publication-ready document.
   errs low (conservative); the first-crossing rule is vindicated on real
   data. If this pattern generalizes, a v2 could quote per-pool books or
   retry rungs, but only after observing more cycles.
-- CORE_COIN_BY_SYMBOL maps only WHYPE/UBTC/UETH. The kHYPE decision
-  (no mapping) is the single most result-shaping call in the loop: with a
-  kHYPE → HYPE mapping the chain would look mostly covered. Revisit only
-  with an unstaking-delay model, not by flipping the constant.
+- Model v2 (metron-v1.3.0+15811c5, 2026-08-13): capacity_ratio divides by
+  LIF (debt-clearing units), and kHYPE maps to its OWN KHYPE/USDC Core
+  book (@336) — measured at $3.3k inside the tolerable band, confirming
+  the thinness the v1 assumption guessed. Owner-supplied facts behind the
+  call: kinetiq.xyz/docs/faq — redemption to HYPE costs 0.1% but queues
+  8-9 days (not liquidation timescale, so kHYPE→HYPE stays unmapped);
+  KHYPE/USDC trades ~$10k/day on Core. The v1 rows (metron-v1.3.0+aead7a1,
+  cycle 15:00) stay in the table; the notebook pins MODEL_VERSION and the
+  newest cycle.
+- Cross-cycle route instability is real: kHYPE/USDC DEX capacity read $62k
+  at the 15:00 cycle and $154k at 16:00 — same pair, different router path
+  choices. Distributional statements about the wall need the accumulated
+  series, not one cycle.
 - The censored row is a small UBTC market: its whole ladder stays under a
   10.8% threshold through $10M. Grid top, not market size, binds there.
 - v_dex_slippage cycles: 14:00 UTC cycle exists only in the deleted local
