@@ -68,4 +68,7 @@ Internal notes; the README is the publication-ready document.
   08:00 cross-section reads $517k (direct RamsesV3 pool route) vs $60-150k
   in earlier cycles — the router-instability wall moves more than first
   documented. The accumulated series, not any single cycle, is the object.
-- Conclusion rewrite deliberately left TODO(owner); Results marked DRAFT.
+- Results and Conclusion closed 2026-08-17 with owner sign-off: DRAFT
+  marker removed, Conclusion rewritten around the grouped ratio as the
+  headline and AVLT's fee_exceeds_margin as the sharpened
+  incentive-cannot-pay case.

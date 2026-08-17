@@ -164,9 +164,6 @@ new version and never rewrites history.
 
 ## Results
 
-DRAFT — owner review (numbers refreshed under model 1.1; framing carried
-over from the v1 cross-section).
-
 All numbers come from `notebook.ipynb` over the cross-section cycle; the
 charts are saved by the notebook into `assets/`. 65 markets: 55 `ok`, 7
 `no_route`, 2 `no_price`, 1 `fee_exceeds_margin`; 64 carry outstanding
@@ -265,29 +262,32 @@ the model's only anti-conservative error.
 
 ## Conclusion
 
-TODO(owner): revise for model 1.1 — the grouped ratio (median 0.040
-against isolated 1.23; kHYPE group 0.011, WHYPE group 0.064, only UBTC
-above 1) arguably becomes the headline number, and AVLT's
-fee_exceeds_margin sharpens the incentive-cannot-pay reading. Framing
-below is the v1 text, numbers superseded by the DRAFT Results above.
-
 The model prices a liquidation as a subsidized swap and asks whether the
-subsidy covers the exit. From finding 1: on the DEX route the answer stops
-depending on the market almost immediately — the router's pooled depth
-walls every pair two orders of magnitude under the large markets' debt,
-so LLTV-driven margin differences barely move capacity. From finding 2:
-real capacity lives where a Core order book holds real depth in the
-collateral itself, and there it is effectively the whole model — while
-kHYPE's own book, measured, holds $3.3k. From finding 3: depth is absent
-exactly where the debt is — half the chain's borrow sits on staked-HYPE
-collateral whose only liquidation-timescale exits are a ~$150k DEX route
-and that empty book, and the five largest markets are covered at five
-cents on the dollar. The
-practical output for cap sizing is the ratio column and its status flags:
-a market's safe borrow scale is set by its collateral's route to real
-depth, not by its LLTV, and the markets that look deepest by TVL are the
-least liquidatable per dollar owed. Every number here is conservative by
+subsidy covers the exit. From finding 1: on the DEX route the answer
+stops depending on the market almost immediately — the router's pooled
+depth walls every pair two orders of magnitude under the large markets'
+debt, so LLTV-driven margin differences barely move capacity. From
+finding 2: real capacity lives where a Core order book holds real depth
+in the collateral itself, and there it is effectively the whole model —
+while kHYPE's own book, measured, holds $3.4k. From finding 3: depth is
+absent exactly where the debt is, and the grouped ratio is the honest
+statement of it. A market's isolated ratio assumes it liquidates alone;
+its collateral group liquidates together, into the same books. Under that
+reading the median market's coverage falls from 1.23 to 0.040, the kHYPE
+group ($45.3M, nearly half the chain) is covered at one cent on the
+dollar, the WHYPE group ($45.2M) at six, and UBTC is the only collateral
+on the chain whose debt the venues can absorb in full. From finding 4:
+the model's zero rows are exact, not missing — unroutable PT collateral,
+and one market (AVLT) whose cheapest route charges more in swap fees than
+the protocol's entire liquidation margin; its earlier $2.3k of apparent
+capacity was an artifact of fee netting that the correction removed.
+
+The practical output for cap sizing is the grouped ratio and the status
+flags: a market's safe borrow scale is set by its collateral's route to
+real depth — shared with every sibling market on that collateral — not by
+its LLTV, and the markets that look deepest by TVL are the least
+liquidatable per dollar owed. Every number is conservative by
 construction and recomputable from its own row months later; what the
 cross-section cannot yet say — how capacity moves, and whether observed
-liquidations respect the modeled wall — is what the accumulating table and
-the liquidation-replay loop exist to answer.
+liquidations respect the modeled wall — is what the accumulating table
+and the liquidation-replay loop exist to answer.
