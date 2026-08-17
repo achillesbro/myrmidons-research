@@ -4,9 +4,15 @@ Per ``v_dex_slippage`` cycle and per market: build the pair's slippage
 ladder, derive the max tolerable slippage from the market's LLTV
 (``mrsearch.protocol``), call ``metron.liquidation_capacity``, add HyperCore
 bid depth for collaterals with a Core spot book, and append one row per
-(as_of, market, model_version) to the outputs namespace. ``capacity_ratio``
-divides the debt-clearing equivalent (``capacity_total / LIF``) by
-outstanding borrow.
+(as_of, market, model_version) to the outputs namespace.
+
+Model 1.1 semantics: the threshold passed to METRON subtracts the $1k
+reference route's blended swap fee (the measured curve nets that fee out,
+which understated liquidator cost); ``capacity_ratio`` divides the
+debt-clearing equivalent (``capacity_total / LIF``) by the market's own
+borrow (isolated liquidation), and ``capacity_ratio_grouped`` divides by
+the summed borrow of every market sharing the collateral (simultaneous
+same-collateral stress under pro-rata depth sharing).
 
 V1 assumptions, declared in each row's ``params``: naive additivity of DEX
 route capacity and Core book depth; Core mid treated as equivalent to the
@@ -44,6 +50,86 @@ CORE_COIN_BY_SYMBOL = {"WHYPE": "HYPE", "UBTC": "UBTC", "UETH": "UETH", "kHYPE":
 
 # A Core book older than this is not used (stale depth would inflate capacity).
 CORE_BOOK_MAX_AGE = pd.Timedelta(hours=24)
+
+# Semantic model version, recorded in params next to the code-level
+# model_version (metron tag + commit).
+MODEL_SEMVER = "1.1"
+
+# Route-hop fee units per venue (verification 2026-08-13, loop 03 CLAUDE.md):
+# - V3-style venues report Uniswap pips (fee / 1e6). Confirmed: removing a
+#   PrjxV3 fee-3000 leg moved measured slippage ~0.1%, excluding the /1e4
+#   reading (30%) outright; tier values (100/500/3000/10000) are canonical.
+# - LiquidCore reports basis points (fee / 1e4). Supported: one added LC-5
+#   hop cost +0.033% measured vs +0.05% predicted at /1e4 (+0.0005% at /1e6).
+#   Also the larger, conservative reading.
+# - RamsesV3 and HybraV4 could not be verified from stored routes: the
+#   larger (/1e4) interpretation is chosen, per the conservative rule.
+FEE_UNIT_DIVISOR = {
+    "HyperSwapV3": 1e6,
+    "PrjxV3": 1e6,
+    "HyperTradeV3": 1e6,
+    "HybraV3": 1e6,
+    "Turbo": 1e6,
+    "UltraSolidV3": 1e6,
+    "LiquidCore": 1e4,
+    "RamsesV3": 1e4,
+    "HybraV4": 1e4,
+}
+# Venues not in the table get the larger (/1e4) reading.
+_UNKNOWN_VENUE_DIVISOR = 1e4
+# Several venues report fee 0 (HyperSwapV2, PrjxV2, KittenSwapV4,
+# NestExchange). That is a reporting gap, not a free swap: a route-switch
+# residual pins NestExchange at ~0.30%, and 0.30% is the canonical V2 fee.
+# Assuming 0 would reintroduce the defect this correction removes.
+ZERO_REPORTED_FEE_DEFAULT = 0.003
+
+
+def blended_route_fee(route: dict) -> float | None:
+    """Blended swap fee of one stored route (the `route_json` blob).
+
+    Within one hop that splits across pools, each split's fee is weighted by
+    its amountIn share of the hop. Across sequential hops, fees compound:
+    f = 1 - prod(1 - f_hop). Returns None when the route holds no hops.
+    """
+    hops = route.get("hopSwaps") or []
+    if not hops:
+        return None
+    keep = 1.0
+    for hop in hops:
+        weights = [float(s.get("amountIn") or 0.0) for s in hop]
+        denom = sum(weights)
+        if denom <= 0.0:  # no amounts recorded: weight splits equally
+            weights = [1.0] * len(hop)
+            denom = float(len(hop))
+        f_hop = 0.0
+        for swap, w in zip(hop, weights, strict=True):
+            raw = swap.get("fee")
+            divisor = FEE_UNIT_DIVISOR.get(str(swap.get("routerName")), _UNKNOWN_VENUE_DIVISOR)
+            fee = (float(raw) / divisor) if raw else 0.0
+            if fee == 0.0:
+                fee = ZERO_REPORTED_FEE_DEFAULT
+            f_hop += (w / denom) * fee
+        keep *= 1.0 - f_hop
+    return 1.0 - keep
+
+
+def capacity_ratios(
+    capacity_total: float, lif: float, borrow: float | None, group_borrow: float | None
+) -> tuple[float | None, float | None]:
+    """(capacity_ratio, capacity_ratio_grouped) in debt-clearing units.
+
+    Both divide capacity / LIF (clearing debt D sells LIF * D of collateral).
+    The isolated ratio divides by the market's own borrow: the market
+    liquidates alone. The grouped ratio divides by the summed borrow of every
+    market sharing the collateral: simultaneous same-collateral stress under
+    pro-rata depth sharing — the pro-rata allocation
+    capacity * (borrow_i / borrow_group) / borrow_i reduces to this closed
+    form. Each is None when its denominator is 0 or unknown.
+    """
+    clearing = capacity_total / lif
+    ratio = clearing / borrow if borrow else None
+    grouped = clearing / group_borrow if group_borrow else None
+    return ratio, grouped
 
 
 def core_depth_within(depth_usd_by_bps: pd.Series, x: float) -> float:
@@ -85,22 +171,37 @@ def build_rows(
 ) -> list[dict]:
     """liq_capacity rows for one cycle. Pure: frames in, row dicts out.
 
-    ``dex``: the cycle's v_dex_slippage rows (token_in, token_out, size_usd,
-    slippage, status). ``market_meta``: one row per market (chain_id,
-    market_id, collateral_token, loan_token, collateral_symbol, lltv as a
-    fraction, borrow_usd, state_ts). ``core_depth``: the freshest eligible
-    book per coin (coin, depth_bps, bid_depth_usd, ts).
+    ``dex``: the cycle's v_dex_slippage rows joined with the raw quotes'
+    route blob (token_in, token_out, size_usd, slippage, status,
+    route_json). ``market_meta``: one row per market (chain_id, market_id,
+    collateral_token, loan_token, collateral_symbol, lltv as a fraction,
+    borrow_usd, state_ts). ``core_depth``: the freshest eligible book per
+    coin (coin, depth_bps, bid_depth_usd, ts).
     """
     from metron import liquidation_capacity
+
+    # Same-collateral markets share their venues' depth: grouped ratios
+    # divide by the summed borrow over the whole collateral group at this
+    # cycle. Every tracked market counts in the denominator, whatever its
+    # own status — dead-router debt still competes for the shared depth.
+    group_borrow_by_coll = market_meta.groupby("collateral_token")["borrow_usd"].sum(min_count=1)
 
     rows: list[dict] = []
     for m in market_meta.itertuples():
         lltv = float(m.lltv)
         lif = lif_from_lltv(lltv)
-        x = max_slippage_threshold(lltv, haircut)
+        x_pre = max_slippage_threshold(lltv, haircut)
 
         pair = dex[(dex["token_in"] == m.collateral_token) & (dex["token_out"] == m.loan_token)]
         ladder = pair.dropna(subset=["slippage"]).set_index("size_usd")["slippage"]
+
+        # The measured slippage curve nets out the $1k reference rung's own
+        # route fee (and impact, treated as 0 at $1k), so the liquidator's
+        # true cost is understated by that fee — subtract it from the
+        # threshold instead. The fee comes from the ref rung's stored route;
+        # fallback: the smallest successful rung that parses.
+        fee_ref = _ref_route_fee(pair)
+        x_used = x_pre if fee_ref is None else max(0.0, x_pre - fee_ref)
 
         core_coin = CORE_COIN_BY_SYMBOL.get(str(m.collateral_symbol))
         coin_book = (
@@ -110,8 +211,8 @@ def build_rows(
 
         censored = False
         capacity_core = 0.0
-        if x == 0.0:
-            status = "zero_threshold"
+        if x_pre == 0.0:
+            status = "zero_threshold"  # the incentive cannot cover the haircut
             capacity_evm = 0.0
         elif pair.empty:
             status = "no_price"  # the pair was never quoted this cycle
@@ -119,28 +220,37 @@ def build_rows(
         elif ladder.empty:
             status = "no_route"  # quoted, every rung failed: zero swap capacity
             capacity_evm = 0.0
+        elif x_used == 0.0:
+            status = "fee_exceeds_margin"  # the ref route's fee alone eats the margin
+            capacity_evm = 0.0
         else:
             status = "ok"
-            capacity_evm, censored = liquidation_capacity(ladder, x)
+            capacity_evm, censored = liquidation_capacity(ladder, x_used)
             if not coin_book.empty:
                 capacity_core = core_depth_within(
-                    coin_book.set_index("depth_bps")["bid_depth_usd"], x
+                    coin_book.set_index("depth_bps")["bid_depth_usd"], x_used
                 )
 
         capacity_total = capacity_evm + capacity_core
         borrow = None if pd.isna(m.borrow_usd) else float(m.borrow_usd)
-        # capacity is SELL-SIDE collateral notional; clearing debt D sells
-        # LIF * D of collateral, so the ratio compares debt-clearing
-        # equivalent (capacity / LIF) to debt.
-        ratio = capacity_total / lif / borrow if borrow else None
+        group_borrow_raw = group_borrow_by_coll.get(m.collateral_token)
+        group_borrow = None if pd.isna(group_borrow_raw) else float(group_borrow_raw)
+        ratio, ratio_grouped = capacity_ratios(capacity_total, lif, borrow, group_borrow)
 
         params = {
+            "model_semver": MODEL_SEMVER,
             "haircut": haircut,
             "size_grid_usd": sorted(float(v) for v in pair["size_usd"]),
             "interpolation": "linear",
             "crossing_rule": "first",
             "venues": ["liquidswap"] + (["hypercore"] if capacity_core > 0.0 else []),
             "core_included": capacity_core > 0.0,
+            "depth_sharing": "pro_rata_by_borrow",
+            # Route overlap ACROSS collateral groups (a kHYPE route crossing
+            # WHYPE pools mid-path) is not modeled; that belongs to the 3c
+            # shock simulator.
+            "cross_group_overlap": "not_modeled",
+            "fee_adjustment": "none" if fee_ref is None else "ref_route_fee",
         }
         input_window = {
             "dex_as_of": as_of.isoformat(),
@@ -159,14 +269,38 @@ def build_rows(
                 "capacity_core_usd": float(capacity_core),
                 "capacity_total_usd": float(capacity_total),
                 "capacity_censored": bool(censored),
-                "max_slippage_used": float(x),
+                "max_slippage_used": float(x_used),
+                "x_pre_fee": float(x_pre),
+                "fee_ref": fee_ref,
                 "lif": float(lif),
                 "outstanding_borrow_usd": borrow,
+                "collateral_group_borrow_usd": group_borrow,
                 "capacity_ratio": ratio,
+                "capacity_ratio_grouped": ratio_grouped,
                 "status": status,
             }
         )
     return rows
+
+
+def _ref_route_fee(pair: pd.DataFrame) -> float | None:
+    """Blended fee of the pair's $1k reference route.
+
+    Walks successful rungs smallest-first (the $1k rung when it succeeded),
+    so a failed or unparseable ref rung falls back to the smallest rung
+    whose route parses. None when nothing parses — the caller keeps the
+    uncorrected threshold and marks the row (never a silent fee of 0)."""
+    if pair.empty or "route_json" not in pair.columns:
+        return None
+    ok = pair[(pair["status"] == "ok") & pair["route_json"].notna()].sort_values("size_usd")
+    for raw in ok["route_json"]:
+        try:
+            fee = blended_route_fee(json.loads(raw))
+        except (ValueError, TypeError):
+            continue
+        if fee is not None:
+            return float(fee)
+    return None
 
 
 _MARKET_META_SQL = """
@@ -212,8 +346,10 @@ def run(
             skipped += 1
             continue
         dex = reader.sql(
-            "SELECT token_in, token_out, size_usd, slippage, status "
-            "FROM v_dex_slippage WHERE ts = ? AND chain_id = ?",
+            "SELECT d.token_in, d.token_out, d.size_usd, d.slippage, d.status, q.route_json "
+            "FROM v_dex_slippage d "
+            "LEFT JOIN dex_quotes q USING (ts, chain_id, token_in, token_out, size_usd) "
+            "WHERE d.ts = ? AND d.chain_id = ?",
             [as_of, int(c.chain_id)],
         )
         meta = reader.sql(_MARKET_META_SQL, [as_of, int(c.chain_id)])

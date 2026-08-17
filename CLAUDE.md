@@ -41,13 +41,19 @@ it computes and writes MNEMON OUTPUT tables (the first is `liq_capacity`).
   atomic tmp+replace, MNEMON-style hive layout).
 - `mrsearch/liq_capacity.py` — orchestration + CLI
   (`uv run python -m mrsearch.liq_capacity`): per v_dex_slippage cycle and
-  market, build the pair's slippage ladder, x from LLTV and haircut, call
+  market, build the pair's slippage ladder, threshold from LLTV and haircut
+  MINUS the $1k reference route's blended swap fee (model 1.1 — the
+  measured curve nets that fee out; per-venue fee units in
+  `FEE_UNIT_DIVISOR`, zero-reported fees default to 0.30%), call
   `metron.liquidation_capacity`, add interpolated HyperCore bid depth
-  (WHYPE/UBTC/UETH only — staked variants deliberately do not map), append
-  rows keyed (as_of, market_id, model_version). Idempotent: cycles already
-  written under the current model version are skipped. Every row carries
-  `params` + `input_window` JSON so it is recomputable from raw MNEMON
-  inputs months later.
+  (WHYPE/UBTC/UETH/kHYPE — books of the same asset only), append rows keyed
+  (as_of, market_id, model_version). Two ratios: `capacity_ratio`
+  (isolated liquidation, own borrow) and `capacity_ratio_grouped`
+  (same-collateral simultaneous stress: pro-rata depth sharing reduces to
+  dividing by the collateral group's summed borrow). Idempotent: cycles
+  already written under the current model version are skipped. Every row
+  carries `params` + `input_window` JSON so it is recomputable from raw
+  MNEMON inputs months later.
 
 ## MNEMON views: chosen approach
 

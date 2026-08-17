@@ -26,6 +26,21 @@ OUTPUTS_DIR = "outputs"
 TS = pa.timestamp("us", tz="UTC")
 
 
+def _sql_type(t: pa.DataType) -> str:
+    """DuckDB SQL type for the pyarrow types output tables use."""
+    if pa.types.is_timestamp(t):
+        return "TIMESTAMPTZ"
+    if pa.types.is_string(t):
+        return "VARCHAR"
+    if pa.types.is_float64(t):
+        return "DOUBLE"
+    if pa.types.is_int32(t):
+        return "INTEGER"
+    if pa.types.is_boolean(t):
+        return "BOOLEAN"
+    raise ValueError(f"no DuckDB mapping for pyarrow type {t}")
+
+
 @dataclass(frozen=True)
 class OutputTable:
     name: str
@@ -47,15 +62,30 @@ LIQ_CAPACITY = OutputTable(
             ("capacity_core_usd", pa.float64()),
             ("capacity_total_usd", pa.float64()),
             ("capacity_censored", pa.bool_()),
-            ("max_slippage_used", pa.float64()),
+            ("max_slippage_used", pa.float64()),  # threshold actually applied (post fee)
+            ("x_pre_fee", pa.float64()),  # threshold before the ref-route fee subtraction
+            ("fee_ref", pa.float64()),  # blended $1k-rung route fee; null when unrecovered
             ("lif", pa.float64()),
             ("outstanding_borrow_usd", pa.float64()),
+            # summed borrow over all tracked markets sharing the collateral
+            # at this cycle (the market itself included)
+            ("collateral_group_borrow_usd", pa.float64()),
+            # capacity_ratio: debt-clearing equivalent / own borrow — the
+            # market liquidates ALONE (isolated-liquidation assumption).
             ("capacity_ratio", pa.float64()),  # null when borrow is 0 or unknown
-            ("status", pa.string()),  # ok | no_route | no_price | zero_threshold
+            # capacity_ratio_grouped: debt-clearing equivalent / group
+            # borrow — simultaneous same-collateral stress under pro-rata
+            # depth sharing. null when group borrow is 0 or unknown.
+            ("capacity_ratio_grouped", pa.float64()),
+            # ok | no_route | no_price | zero_threshold | fee_exceeds_margin
+            ("status", pa.string()),
         ]
     ),
     keys=["as_of", "market_id", "model_version"],
 )
+
+# Columns added after v1 rows were written read as NULL on old rows; see
+# OutputStore.read.
 
 
 class OutputStore:
@@ -72,18 +102,27 @@ class OutputStore:
         return d.exists() and any(d.rglob("*.parquet"))
 
     def read(self, table: OutputTable) -> pd.DataFrame:
-        """The whole output table as a DataFrame (empty frame when absent)."""
+        """The whole output table as a DataFrame (empty frame when absent).
+
+        Presents the FULL current schema whatever the vintage of the files:
+        a column added after older day files were written is served as
+        typed NULLs for those rows (same approach as MNEMON's raw views)."""
         if not self.has_data(table):
             return pd.DataFrame({f.name: pd.Series(dtype="object") for f in table.schema})
         import duckdb
 
         con = duckdb.connect()
         try:
-            return con.execute(
-                f"SELECT {', '.join(f.name for f in table.schema)} "
-                f"FROM read_parquet('{self.table_glob(table)}', "
+            rel = (
+                f"read_parquet('{self.table_glob(table)}', "
                 "hive_partitioning = 1, union_by_name = 1)"
-            ).df()
+            )
+            present = {row[0] for row in con.execute(f"DESCRIBE SELECT * FROM {rel}").fetchall()}
+            cols = [
+                f.name if f.name in present else f"NULL::{_sql_type(f.type)} AS {f.name}"
+                for f in table.schema
+            ]
+            return con.execute(f"SELECT {', '.join(cols)} FROM {rel}").df()
         finally:
             con.close()
 
