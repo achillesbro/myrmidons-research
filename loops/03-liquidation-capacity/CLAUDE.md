@@ -39,3 +39,33 @@ Internal notes; the README is the publication-ready document.
 - Next runs of this loop: time-variation of capacity_ratio once weeks of
   cycles exist; calibration against observed liquidations (fil d'Ariane E4)
   — does realized liquidator flow respect the modeled wall?
+
+## Model 1.1 (2026-08-17, metron-v1.3.0+390430e)
+
+- Fee-unit verification surprises: (1) the route `fee` field is NOT one
+  unit — V3-style venues report Uniswap pips (/1e6; confirmed by a
+  route-switch residual: removing a PrjxV3-3000 leg moved slippage ~0.1%,
+  excluding the /1e4 reading outright), while LiquidCore reports bps
+  (/1e4; an added LC-5 hop cost +3.3 bps measured vs +5 predicted).
+  (2) Venues reporting fee 0 (HyperSwapV2, PrjxV2, KittenSwapV4,
+  NestExchange) are a reporting gap, not free: a residual pins
+  NestExchange at ~0.30% — 0.30% default adopted for all of them.
+  (3) RamsesV3 and HybraV4 stayed ambiguous; larger (/1e4) reading chosen.
+- v1 -> v1.1 deltas at the shared cycle (2026-08-16 23:00): 56 of 65
+  markets lose capacity to the fee correction (median ref fee 15 bps,
+  p75 36 bps, max 2.1%); one status change — AVLT/USD₮0 ok ->
+  fee_exceeds_margin (route fee 2.3% > margin 2.1%; its v1 capacity $2.3k
+  was an illusion of the netted-out fee). Largest single reduction $151k.
+- The grouped ratio is the bigger of the two changes: isolated median
+  1.21-1.23 vs grouped median 0.040; 51 of 64 markets shrink. Only the
+  UBTC group clears 1 (2.97). kHYPE group $45.3M at 0.011; WHYPE group
+  $45.2M at 0.064. The "34 of 64 markets clear ratio 1" line survives only
+  under the isolated assumption.
+- The 90-cycle retroactive recompute worked exactly as designed: the fee
+  data was already in every stored route_json, so the whole accumulated
+  series (5,850 rows) recomputed under v1.1 in one idempotent run.
+- Recompute contradiction to watch: kHYPE/WHYPE's DEX capacity at the
+  08:00 cross-section reads $517k (direct RamsesV3 pool route) vs $60-150k
+  in earlier cycles — the router-instability wall moves more than first
+  documented. The accumulated series, not any single cycle, is the object.
+- Conclusion rewrite deliberately left TODO(owner); Results marked DRAFT.
