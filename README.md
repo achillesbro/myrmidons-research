@@ -9,9 +9,9 @@ of a three-part stack:
 - **[METRON](https://github.com/achillesbro/METRON)** — the pure statistical
   metric library, installed here as a git dependency pinned by tag.
 - **myrmidons-research** (this repo) — research loops, risk-framework work,
-  write-ups, and the Phase 3 risk engine: it computes MNEMON OUTPUT tables
-  (first: `liq_capacity`) and writes them to the store's `outputs/`
-  namespace. Ingestion tables stay read-only.
+  write-ups, and the Phase 3 risk engine. The risk engine computes MNEMON
+  OUTPUT tables such as `liq_capacity` and writes them to the store's
+  `outputs/` namespace. Ingestion tables stay read-only.
 
 ## Setup
 
@@ -71,28 +71,33 @@ A result without a manifest is not reproducible and does not count.
 
 ## Risk engine: liq_capacity
 
-The write side of Phase 3a. Per `v_dex_slippage` cycle and per market, the
-runner builds the pair's slippage ladder, derives the max tolerable
-liquidation slippage from the market's LLTV (Morpho Blue algebra in
-`mrsearch.protocol`), calls `metron.liquidation_capacity`, adds HyperCore bid
-depth for collaterals with a Core spot book, and appends one row per
-(as_of, market_id, model_version) to `outputs/liq_capacity/`:
+This is the write side of Phase 3a. The runner processes each
+`v_dex_slippage` cycle, market by market. It builds the pair's slippage
+ladder. It derives the max tolerable liquidation slippage from the
+market's LLTV, a haircut, and the $1k reference route's blended swap fee
+(Morpho Blue algebra in `mrsearch.protocol`). It calls
+`metron.liquidation_capacity` on the ladder. It adds HyperCore bid depth
+where a Core spot book trades the collateral itself. It appends one row
+per (as_of, market_id, model_version) to `outputs/liq_capacity/`, with
+two coverage ratios: `capacity_ratio` (the market liquidates alone) and
+`capacity_ratio_grouped` (all markets on the same collateral liquidate
+together and share the depth).
 
 ```bash
 uv run python -m mrsearch.liq_capacity --data data --mnemon-repo ~/mnemon
 ```
 
-The runner is idempotent (cycles already written under the current model
-version are skipped) and cron-friendly. The canonical run happens on the VPS:
-a daily systemd timer (`systemd/liq-capacity.timer` -> `run_liq_capacity.sh`,
+The runner is idempotent: it skips cycles already written under the
+current model version. The canonical run happens on the VPS, where a daily
+systemd timer (`systemd/liq-capacity.timer` -> `run_liq_capacity.sh`,
 00:20 UTC) processes every cycle the ingestion accumulated. A local run
-against `data/` is a dry computation on a snapshot — note that the next
-`rsync --delete` replaces `data/` (including `data/outputs/`) with the VPS
-state, which carries the canonical outputs down.
+against `data/` is a dry computation on a snapshot. The next
+`rsync --delete` replaces `data/`, including `data/outputs/`, with the VPS
+state — the canonical outputs arrive with the same sync.
 
-Output tables are append-only, live only under `outputs/`, and every row
-carries its `model_version`, `params` and `input_window`, so any row can be
-recomputed from the raw MNEMON inputs months later.
+Output tables are append-only and live only under `outputs/`. Every row
+carries its `model_version`, `params` and `input_window`, so any row can
+be recomputed from the raw MNEMON inputs months later.
 
 ## Rules
 

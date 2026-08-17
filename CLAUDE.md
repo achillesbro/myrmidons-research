@@ -3,8 +3,8 @@
 myrmidons-research is the consumer repo of a three-part stack: MNEMON (Parquet/
 DuckDB archive of Morpho Blue state, the ingestion side), METRON (pure
 statistical metric library), and this repo (research loops, risk-framework
-work, write-ups). Since 2026-08-13 it is also the Phase 3 risk-engine repo:
-it computes and writes MNEMON OUTPUT tables (the first is `liq_capacity`).
+work, write-ups). It is also the Phase 3 risk-engine repo (since 2026-08-13):
+it computes and writes MNEMON OUTPUT tables such as `liq_capacity`.
 
 ## Hard rules
 
@@ -16,12 +16,12 @@ it computes and writes MNEMON OUTPUT tables (the first is `liq_capacity`).
   `mnemon.duckdb`. The reader is an in-memory DuckDB over the `data/` globs.
 - **One write namespace: `<data>/outputs/`.** The risk engine writes MNEMON
   OUTPUT tables under an `outputs/` prefix inside the store, physically
-  separate from ingestion data. Only `mrsearch.outputs.OutputStore` writes,
-  it resolves every path under that prefix, and nothing here ever writes
+  separate from ingestion data. Only `mrsearch.outputs.OutputStore` writes.
+  It resolves every path under that prefix, and nothing here ever writes
   outside it. MNEMON's ingestion enumerates its own table specs and never
   scans `outputs/`; `SnapshotReader` never registers output tables. Output
   tables are APPEND-ONLY: existing keys always win, history is never
-  rewritten, a model change writes new rows under a new `model_version`.
+  rewritten, and a model change writes new rows under a new `model_version`.
 - **No statistical logic in SQL.** SQL does per-row algebra only (unit scaling,
   joins, filters, resampling keys). Statistics live in METRON. If a metric is
   missing from METRON, do NOT implement it here — leave
@@ -40,20 +40,21 @@ it computes and writes MNEMON OUTPUT tables (the first is `liq_capacity`).
   (`LIQ_CAPACITY`) + `OutputStore` (append-only, day-partitioned on `as_of`,
   atomic tmp+replace, MNEMON-style hive layout).
 - `mrsearch/liq_capacity.py` — orchestration + CLI
-  (`uv run python -m mrsearch.liq_capacity`): per v_dex_slippage cycle and
-  market, build the pair's slippage ladder, threshold from LLTV and haircut
-  MINUS the $1k reference route's blended swap fee (model 1.1 — the
-  measured curve nets that fee out; per-venue fee units in
-  `FEE_UNIT_DIVISOR`, zero-reported fees default to 0.30%), call
-  `metron.liquidation_capacity`, add interpolated HyperCore bid depth
-  (WHYPE/UBTC/UETH/kHYPE — books of the same asset only), append rows keyed
-  (as_of, market_id, model_version). Two ratios: `capacity_ratio`
+  (`uv run python -m mrsearch.liq_capacity`). Per v_dex_slippage cycle and
+  market: build the pair's slippage ladder; compute the threshold from
+  LLTV and haircut, minus the $1k reference route's blended swap fee (the
+  measured curve nets that fee out; per-venue fee units live in
+  `FEE_UNIT_DIVISOR`, and zero-reported fees default to 0.30%); call
+  `metron.liquidation_capacity`; add interpolated HyperCore bid depth
+  (WHYPE/UBTC/UETH/kHYPE — books of the same asset only); append rows
+  keyed (as_of, market_id, model_version). Two ratios: `capacity_ratio`
   (isolated liquidation, own borrow) and `capacity_ratio_grouped`
   (same-collateral simultaneous stress: pro-rata depth sharing reduces to
-  dividing by the collateral group's summed borrow). Idempotent: cycles
-  already written under the current model version are skipped. Every row
-  carries `params` + `input_window` JSON so it is recomputable from raw
-  MNEMON inputs months later.
+  dividing by the collateral group's summed borrow). The semantic model
+  version is `MODEL_SEMVER`, recorded as `model_semver` in `params`.
+  Idempotent: cycles already written under the current model version are
+  skipped. Every row carries `params` + `input_window` JSON so it is
+  recomputable from raw MNEMON inputs months later.
 
 ## MNEMON views: chosen approach
 
