@@ -51,22 +51,22 @@ Three caveats set the limits of the data:
 
 `capacity_total_usd` answers one question: if liquidation had to happen
 now, how many dollars of this market's collateral could a liquidator sell,
-in one transaction, into the liquidity we can observe, before the
-liquidation stops being profitable? Below this size, liquidation is a
-profitable arbitrage and can be expected promptly. Beyond it, every
-additional dollar liquidated loses money, so the remaining debt waits —
-for pool refills, for off-venue buyers, or for a deeper price move that
-re-arms the incentive. `capacity_ratio` states what fraction of the
-market's outstanding debt sits on the profitable side of that line.
+in one transaction, into the observable liquidity, before the liquidation
+stops being profitable? Below this size, liquidation is a profitable
+arbitrage and can be expected promptly. Beyond it, every additional dollar
+liquidated loses money. The remaining debt then waits for pool refills,
+for off-venue buyers, or for a deeper price move that restores the
+incentive. The ratio columns state what fraction of debt sits on the
+profitable side of that line.
 
 The number is deliberately narrow in three ways. It is instantaneous: one
-snapshot of quoted liquidity, no replenishment, so it bounds from below
-what a patient liquidator could clear over hours — and it is exactly the
-binding number when waiting is what hurts (a fast depeg). It is
-market-level: it does not read the health-factor distribution; it is the
-ceiling on profitable clearing whatever the queue of positions looks like.
-And it is supply-side only: it says nothing about whether that much debt
-will need liquidating.
+snapshot of quoted liquidity, with no replenishment. It therefore bounds
+from below what a patient liquidator could clear over hours, and it is the
+binding number when the price moves fast (a depeg). It is market-level: it
+does not read the health-factor distribution, and it is the limit on
+profitable clearing for any distribution of positions. And it is
+supply-side only: it says nothing about whether that much debt will need
+liquidating.
 
 ### Derivation
 
@@ -85,9 +85,9 @@ slippage stays below the margin, so the max tolerable slippage is
 
 with `h = 0.005`, a haircut for gas, latency and inventory risk. When
 `x <= 0` the incentive cannot cover the haircut and modeled capacity is
-zero by construction (`zero_threshold`). A high-LLTV market therefore has
-tight capacity twice over: less margin per liquidation and a lower
-tolerable slippage.
+zero by construction (`zero_threshold`). Two effects reduce a high-LLTV
+market's capacity: less margin per liquidation and a lower tolerable
+slippage.
 
 DEX-route capacity is METRON's `liquidation_capacity` on the pair's quoted
 slippage ladder: sort by size, interpolate linearly, return the first size
@@ -95,12 +95,13 @@ where the curve reaches `x`. Three choices keep the estimate conservative.
 Slippage is convex in size, so the linear chord overestimates slippage
 between rungs and the crossing lands early. The first crossing decides: a
 curve that dips back below the threshold at a larger size does not reopen
-capacity. Such dips are real in the data and they are router artifacts, not
-liquidity: the aggregator's path search is not monotone in size, and it can
-pick a worse route at one rung than at the next (the stored `route_json`
-per rung shows which route each quote used). There is no extrapolation: a curve that
-never crosses is right-censored at the largest quoted size and the true
-capacity is at least the reported value (`capacity_censored`).
+capacity. Such dips are real in the data, and they are router artifacts,
+not liquidity. The aggregator's path search is not monotone in size: it
+can pick a worse route at one rung than at the next. The stored
+`route_json` per rung shows which route each quote used. There is no
+extrapolation: a curve that never crosses is right-censored at the largest
+quoted size, and the true capacity is at least the reported value
+(`capacity_censored`).
 
 Core-book capacity applies only where a Core spot book trades the
 collateral ITSELF: WHYPE → HYPE, UBTC, UETH, and kHYPE → its own
@@ -137,21 +138,22 @@ collateral groups (one collateral's route crossing another's pools
 mid-path) is not modeled here; it belongs to the shock simulator.
 
 The threshold subtracts one more cost. The slippage curve is measured
-against the same cycle's $1k reference rung, so the reference route's own
-swap fee (and its impact, treated as 0 at $1k and declared) nets out of
-every measured value — the liquidator still pays it. The threshold applied
-is `x_used = max(0, x - fee_ref)`, with `fee_ref` the blended fee of the
-$1k rung's stored route: within a hop that splits across pools, each
-split's fee weighs by its amountIn share; across sequential hops, fees
-compound. Fee units are per-venue (verified against stored routes:
-V3-style venues report Uniswap pips, fee/1e6; LiquidCore reports basis
-points; venues reporting fee 0 are a reporting gap, not free swaps, and
-carry a 0.30% default). When the reference route cannot be recovered, the
-threshold stays uncorrected and the row says so — never a silent fee of
-zero. A market whose reference-route fee alone eats the margin reports
-`fee_exceeds_margin`, distinct from `zero_threshold` (haircut alone).
+against the same cycle's $1k reference rung. The reference route's own
+swap fee therefore nets out of every measured value, but the liquidator
+still pays it. (The reference rung's impact also nets out; the model
+treats it as 0 and declares this.) The threshold applied is
+`x_used = max(0, x - fee_ref)`. `fee_ref` is the blended fee of the $1k
+rung's stored route: within a hop that splits across pools, each split's
+fee weighs by its amountIn share; across sequential hops, fees compound. Fee units are per-venue, verified against stored routes:
+V3-style venues report Uniswap pips (fee/1e6), LiquidCore reports basis
+points, and a reported fee of 0 is a reporting gap, not a free swap — such
+venues carry a 0.30% default. When no reference route can be recovered,
+the threshold keeps the full value of `x` and the row records that no fee
+was subtracted — never a silent fee of zero. A market whose
+reference-route fee alone exceeds the margin reports `fee_exceeds_margin`,
+distinct from `zero_threshold` (haircut alone).
 
-Two v1 simplifications are declared in every row's `params`: additivity of
+Two declared simplifications live in every row's `params`: additivity of
 the two venues (their standing inventories are distinct, but arbitrage
 links them under stress), and Core mid treated as equivalent to the oracle
 mark.
@@ -169,58 +171,59 @@ charts are saved by the notebook into `assets/`. 65 markets: 55 `ok`, 7
 `no_route`, 2 `no_price`, 1 `fee_exceeds_margin`; 64 carry outstanding
 borrow.
 
-### Finding 1 — The DEX route walls out two orders of magnitude under the debt
+### Finding 1 — The DEX route stops two orders of magnitude below the debt
 
 Across markets with a routable pair, DEX capacity clusters far below the
 large markets' debt: median $12k, p75 $56k, p95 $145k. The largest markets
-cross their fee-corrected thresholds between $55k and $517k, and their
-slippage curves collapse onto the same cliff despite different pairs and
-different thresholds:
+cross their thresholds between $55k and $517k, and their slippage curves
+steepen in the same size region despite different pairs and different
+thresholds:
 
 ![Slippage ladders and thresholds](assets/slippage_ladders.png)
 
 Reading: the aggregator's pooled depth, not any market's own parameters,
-sets the DEX-route capacity. Doubling the margin (`x` of 0.108 against
-0.064) buys almost no extra size — the curves are near-vertical where they
-cross. The kHYPE/WHYPE panel shows the first-crossing rule at work. The
-quoted curve collapses at $500k, then returns to par at $1M. The stored
-routes explain the dip: at $100k and $1M the router selects a direct
-kHYPE → WHYPE concentrated-liquidity pool at near-zero impact, while at
+sets the DEX-route capacity. A doubled margin (`x` of 0.108 against 0.064)
+adds almost no size, because the curves are near-vertical where they
+cross. The kHYPE/WHYPE panel shows the first-crossing rule on real data.
+The quoted slippage jumps above 80% at $500k, then returns to par at $1M.
+The stored routes explain the dip. At $100k and $1M the router selects a
+direct kHYPE → WHYPE concentrated-liquidity pool at near-zero impact. At
 $500k and $5M it routes through a kHYPE → USDC leg with about $56k of
-effective depth. The recovery at $1M is the router re-finding a route that
-also existed at $500k, not liquidity appearing at size. The model refuses
-to count the region past the first crossing, which is correct here twice:
-the dip is a search artifact, and if the direct pool truly holds that
-depth, the reported capacity errs low, never high. The same instability
-moves the wall between cycles — the same pair's crossing shifted by 2x
-from one hour to the next as the router's path choice changed — without
-ever bringing it within reach of the large markets' debt. The wall raises
-the question finding 2 answers: what carries capacity beyond the router?
+effective depth. The recovery at $1M is the router selecting a
+route that also existed at $500k. It is not liquidity that appears at
+size. The model does not count the region past the first crossing. That
+rule is correct here twice: the dip is a search artifact, and if the
+direct pool truly holds that depth, the reported capacity errs low, never
+high. The same instability moves the crossing between cycles — the same
+pair's crossing shifted by 2x from one hour to the next as the router's
+path choice changed — but it never comes near the large markets' debt.
+This limit raises the question finding 2 answers: what carries capacity
+beyond the router?
 
 ### Finding 2 — Where a Core book exists, it is the capacity; kHYPE's holds $3.4k
 
 29 markets have collateral with a Core spot book, and for them the book
-contributes 97.7% of modeled capacity: the HYPE book adds $3.0M and the
+contributes 97.7% of modeled capacity. The HYPE book adds $3.0M and the
 UBTC book $6.3M of tolerable-slippage depth, against DEX legs of
 $2k–$517k. Modeled capacity is, in practice, Core depth wherever real
-Core depth applies. The counter-case proves the rule: kHYPE maps to its
-own KHYPE/USDC book, and that book holds $3.4k inside the tolerable band —
-a listed pair with no depth. The measurement replaces the earlier
-assumption and changes nothing: kHYPE's exit is the DEX route. This
-raises finding 3: most of the chain's debt sits on collateral whose book
-is absent or empty.
+Core depth applies. kHYPE is the counter-case: it maps to its own
+KHYPE/USDC book, and that book holds $3.4k inside the tolerable band — a
+listed pair with almost no depth. kHYPE's usable exit is therefore the
+DEX route. This raises finding 3: most of the chain's debt sits on
+collateral whose book is absent or almost empty.
 
 ### Finding 3 — The largest debt stacks are the least covered
 
 The aggregate hides the problem: $99.7M of outstanding borrow against
 $83.1M of modeled capacity reads as near-parity. The distribution inverts
-it. 34 of 64 markets clear an isolated ratio of 1, but they are small —
-the five largest markets hold 83.8% of the chain's debt and their pooled
-ratio is 0.046. The grouped ratio inverts it harder: the isolated median
-is 1.23, the grouped median is 0.040, and 51 of 64 markets shrink when
-their same-collateral neighbors compete for the same depth. Per collateral
-group: kHYPE owes $45.3M at a grouped ratio of 0.011, WHYPE owes $45.2M at
-0.064, and UBTC ($2.0M at 2.97) is the only group above 1.
+it. 34 of 64 markets clear an isolated ratio of 1, but they are small.
+The five largest markets hold 83.8% of the chain's debt, and their pooled
+ratio is 0.046. The grouped ratio inverts it further: the isolated median
+is 1.23, the grouped median is 0.040, and the ratio of 51 of 64 markets
+falls when their same-collateral neighbors compete for the same depth.
+Per collateral group: kHYPE owes $45.3M at a grouped ratio of 0.011,
+WHYPE owes $45.2M at 0.064, and UBTC ($2.0M at 2.97) is the only group
+above 1.
 
 ![Capacity against outstanding borrow](assets/capacity_vs_borrow.png)
 
@@ -234,14 +237,13 @@ The composition of the top of the table:
   debt; the deep HYPE book does not apply, because unstaking into it takes
   days.
 - WHYPE/USDC, the largest single market at $38.6M, reaches an isolated
-  0.075 and a grouped 0.064 even with the HYPE book: the fee-corrected
-  `x = 0.061` caps the usable band of the book at $3.0M, shared across
-  $45.2M of WHYPE-collateralized debt.
+  0.075 and a grouped 0.064 even with the HYPE book. Its applied threshold
+  `x_used = 0.061` caps the usable band of the book at $3.0M, and $45.2M
+  of WHYPE-collateralized debt shares that band.
 - AVLT/USD₮0 owes $2.9M at capacity zero, status `fee_exceeds_margin`:
-  LLTV 0.915 leaves a 2.1% margin and the pair's cheapest quoted route
-  charges 2.3% in swap fees alone. Under v1 this market showed $2.3k of
-  capacity; the fee correction shows the incentive cannot pay for any
-  exit at all.
+  LLTV 0.915 leaves a 2.1% margin, and the pair's cheapest quoted route
+  charges 2.3% in swap fees alone. The incentive cannot pay for any exit
+  at any size.
 
 Reading: capacity and debt live on different collaterals. The markets that
 would matter in a stress event are precisely the ones the venues cannot
@@ -251,43 +253,43 @@ absorb within the protocol's incentive.
 
 Seven pairs return `no_route` at every rung: six PT-kHYPE markets and
 sUSDe/USH, together owing $0.3M. The aggregator cannot swap these
-collaterals at all — a liquidator's exit is redemption or an off-router
-venue, both outside this model, so modeled capacity is zero rather than
-unknown. The fee correction adds a second zero-capacity class:
-`fee_exceeds_margin` (AVLT/USD₮0 above), where a route exists but its fee
-alone exceeds the liquidation margin. Across the cycle, the correction is
-small but one-sided: the median reference route charges 15 bps, the
-largest 2.1%, and 56 of 65 markets lose some capacity to it — it removes
-the model's only anti-conservative error.
+collaterals at all. A liquidator's exit is then redemption or an
+off-router venue, both outside this model, so modeled capacity is zero
+rather than unknown. The second zero-capacity class is
+`fee_exceeds_margin` (AVLT/USD₮0 above): a route exists, but its fee alone
+exceeds the liquidation margin. The fee term itself is small but
+one-sided: the median reference route charges 15 bps, the largest 2.1%,
+and it lowers the capacity of 56 of 65 markets. Without it, the measured
+slippage would understate the liquidator's true cost — the one error
+direction the model must not have.
 
 ## Conclusion
 
 The model prices a liquidation as a subsidized swap and asks whether the
 subsidy covers the exit. From finding 1: on the DEX route the answer
-stops depending on the market almost immediately — the router's pooled
-depth walls every pair two orders of magnitude under the large markets'
-debt, so LLTV-driven margin differences barely move capacity. From
-finding 2: real capacity lives where a Core order book holds real depth
-in the collateral itself, and there it is effectively the whole model —
-while kHYPE's own book, measured, holds $3.4k. From finding 3: depth is
-absent exactly where the debt is, and the grouped ratio is the honest
-statement of it. A market's isolated ratio assumes it liquidates alone;
-its collateral group liquidates together, into the same books. Under that
-reading the median market's coverage falls from 1.23 to 0.040, the kHYPE
-group ($45.3M, nearly half the chain) is covered at one cent on the
-dollar, the WHYPE group ($45.2M) at six, and UBTC is the only collateral
-on the chain whose debt the venues can absorb in full. From finding 4:
-the model's zero rows are exact, not missing — unroutable PT collateral,
-and one market (AVLT) whose cheapest route charges more in swap fees than
-the protocol's entire liquidation margin; its earlier $2.3k of apparent
-capacity was an artifact of fee netting that the correction removed.
+stops depending on the market almost immediately. The router's pooled
+depth limits every pair to two orders of magnitude below the large
+markets' debt, so LLTV-driven margin differences barely move capacity.
+From finding 2: real capacity lives where a Core order book holds real
+depth in the collateral itself, and there it is effectively the whole
+model — while kHYPE's own book, measured, holds $3.4k. From finding 3:
+depth is absent exactly where the debt is, and the grouped ratio states
+it correctly. A market's isolated ratio assumes it liquidates alone; its
+collateral group liquidates together, into the same books. Under that
+reading the median market's coverage falls from 1.23 to 0.040. The kHYPE
+group ($45.3M, nearly half the chain) has a grouped ratio of 0.011, the
+WHYPE group ($45.2M) 0.064. UBTC is the only collateral on the chain
+whose debt the venues can absorb in full. From finding 4: the model's
+zero rows are exact, not missing — unroutable PT collateral, and one
+market (AVLT) whose cheapest route charges more in swap fees than the
+protocol's entire liquidation margin pays.
 
 The practical output for cap sizing is the grouped ratio and the status
-flags: a market's safe borrow scale is set by its collateral's route to
-real depth — shared with every sibling market on that collateral — not by
-its LLTV, and the markets that look deepest by TVL are the least
-liquidatable per dollar owed. Every number is conservative by
-construction and recomputable from its own row months later; what the
-cross-section cannot yet say — how capacity moves, and whether observed
-liquidations respect the modeled wall — is what the accumulating table
-and the liquidation-replay loop exist to answer.
+flags. A market's safe borrow scale is set by its collateral's route to
+real depth, shared with every sibling market on that collateral — not by
+its LLTV. The markets that look deepest by TVL are the least liquidatable
+per dollar owed. Every number is conservative by construction and
+recomputable from its own row months later. What the cross-section cannot
+yet say — how capacity moves over time, and whether observed liquidations
+stay below the modeled limit — is what the accumulating table and the
+liquidation-replay loop exist to answer.
