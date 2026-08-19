@@ -1,24 +1,27 @@
 # CLAUDE.md
 
-myrmidons-research is the consumer repo of a three-part stack: MNEMON (Parquet/
+myrmidons-research is the consumer repo of a four-part stack: MNEMON (Parquet/
 DuckDB archive of Morpho Blue state, the ingestion side), METRON (pure
-statistical metric library), and this repo (research loops, risk-framework
-work, write-ups). It is also the Phase 3 risk-engine repo (since 2026-08-13):
-it computes and writes MNEMON OUTPUT tables such as `liq_capacity`.
+statistical metric library), myrmidons-api (the production risk engine: it
+computes and writes MNEMON OUTPUT tables such as `liq_capacity`), and this
+repo (research loops, risk-framework work, write-ups). The risk engine lived
+here 2026-08-13 → 2026-08-19; it now lives in myrmidons-api.
 
 ## Hard rules
 
-- **Boundary.** This repo imports METRON (git dependency, pinned by tag in
-  pyproject.toml). METRON must never import this repo, and nothing here goes
-  upstream into it. MNEMON is a data source, not a dependency of record.
+- **Boundary.** This repo imports METRON and myrmidons-api (git dependencies,
+  pinned by tag in pyproject.toml). Neither must ever import this repo, and
+  nothing here goes upstream into them. MNEMON is a data source, not a
+  dependency of record. Production compute (output writers, orchestrators,
+  protocol algebra) belongs in myrmidons-api, never here.
 - **Read-only against MNEMON ingestion.** Every ingestion table and derived
   view stays read-only: never write their Parquet, never open the ingestion's
   `mnemon.duckdb`. The reader is an in-memory DuckDB over the `data/` globs.
-- **One write namespace: `<data>/outputs/`.** The risk engine writes MNEMON
-  OUTPUT tables under an `outputs/` prefix inside the store, physically
-  separate from ingestion data. Only `mrsearch.outputs.OutputStore` writes.
-  It resolves every path under that prefix, and nothing here ever writes
-  outside it. MNEMON's ingestion enumerates its own table specs and never
+- **One write namespace: `<data>/outputs/`.** The risk engine (myrmidons-api)
+  writes MNEMON OUTPUT tables under an `outputs/` prefix inside the store,
+  physically separate from ingestion data. Only
+  `myrmidons_api.outputs.OutputStore` writes; this repo never writes the
+  store at all. MNEMON's ingestion enumerates its own table specs and never
   scans `outputs/`; `SnapshotReader` never registers output tables. Output
   tables are APPEND-ONLY: existing keys always win, history is never
   rewritten, and a model change writes new rows under a new `model_version`.
@@ -31,40 +34,16 @@ it computes and writes MNEMON OUTPUT tables such as `liq_capacity`.
   `mrsearch.snapshot.write_manifest` before anything runs. The notebook's first
   cell reads and prints it. A result without a manifest does not count.
 
-## Module map (risk engine)
+## Module map
 
-- `mrsearch/protocol.py` — Morpho Blue algebra (`lif_from_lltv`,
-  `max_slippage_threshold`). Deliberately local: METRON stays
-  protocol-agnostic; these constants come from the contract.
-- `mrsearch/outputs.py` — the outputs namespace: `OutputTable` specs
-  (`LIQ_CAPACITY`) + `OutputStore` (append-only, day-partitioned on `as_of`,
-  atomic tmp+replace, MNEMON-style hive layout).
-- `mrsearch/liq_capacity.py` — orchestration + CLI
-  (`uv run python -m mrsearch.liq_capacity`). Per v_dex_slippage cycle and
-  market: build the pair's slippage ladder; compute the threshold from
-  LLTV and haircut, minus the $1k reference route's blended swap fee (the
-  measured curve nets that fee out; per-venue fee units live in
-  `FEE_UNIT_DIVISOR`, and zero-reported fees default to 0.30%); call
-  `metron.liquidation_capacity`; add interpolated HyperCore bid depth
-  (WHYPE/UBTC/UETH/kHYPE — books of the same asset only); append rows
-  keyed (as_of, market_id, model_version). Two ratios: `capacity_ratio`
-  (isolated liquidation, own borrow) and `capacity_ratio_grouped`
-  (same-collateral simultaneous stress: pro-rata depth sharing reduces to
-  dividing by the collateral group's summed borrow). The semantic model
-  version is `MODEL_SEMVER`, recorded as `model_semver` in `params`.
-  Idempotent: cycles already written under the current model version are
-  skipped. Every row carries `params` + `input_window` JSON so it is
-  recomputable from raw MNEMON inputs months later.
-
-## MNEMON views: chosen approach
-
-`mnemon_reader.SnapshotReader` imports the table specs and derived-view
-definitions from a **local MNEMON checkout** — `$MNEMON_REPO` (or the
-`mnemon_repo=` arg); its `src/` is put on `sys.path` and `mnemon.schemas`,
-`mnemon.storage.Store`, `mnemon.views.create_derived_views` are imported by
-reference. `views.py` is never vendored into this repo, so the `v_*` views here
-can never drift from what the ingestion produces. Table docs: MNEMON's
-`llms.txt`.
+- `mrsearch/snapshot.py` — loop provenance (`Manifest`, `write_manifest`,
+  `read_manifest`). The only package code left in this repo.
+- Everything else (protocol algebra, `SnapshotReader`, `OutputStore`, the
+  liq_capacity orchestrator, systemd units) moved to **myrmidons-api**
+  (2026-08-19). Loops import it directly:
+  `from myrmidons_api import SnapshotReader, OutputStore, LIQ_CAPACITY`.
+  Its `SnapshotReader` still imports MNEMON table specs and views by
+  reference from a local checkout (`$MNEMON_REPO`) — never vendored.
 
 ## Loop convention
 
