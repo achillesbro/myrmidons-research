@@ -91,6 +91,26 @@ Internal notes; the README is the publication-ready document.
   borrow == supply, a synthetic position that dominates any weighted
   figure; RLP/USDC ($50M) and AZND/USDC are unlisted too. The README's
   weighted numbers use listed markets; the notebook prints both.
+- V2 allocations (owner remark 2026-09-08, "Steakhouse has ~700M on Base,
+  you show 400M"): MNEMON's `vault_allocations` job walked V1 vaults only;
+  V2 vaults (Steakhouse Prime USDC V2 $430M, High Yield USDC Edition
+  $382M, Gauntlet USDC Prime V2 $95M, ... on Base alone) had zero
+  allocation rows. Fixed upstream in MNEMON PR #24 (b2b0dee): V2 rows come
+  from `vaultV2ByAddress.caps` MarketV1 items (allocation = supply,
+  absoluteCap = cap, shares null). First tick with V2 rows: 2026-09-08
+  12:45 UTC (1583 rows, 95 v1 + 176 v2 vaults). Snapshot re-rsynced, manifest
+  commit moved a10446e -> b2b0dee, cross-section cycle moved 08:00 -> 12:00
+  (small drifts: 516 markets, 268 no verdict, $2,767M listed borrow). Lane 4
+  went from 74 vaults / $1,357M / 16 curators to 214 / $4,335M / 40.
+  Sentora ($931M, PayPal USD Main) and Sky Money are ~90% unjudged: their
+  PYUSD/RLUSD/sUSDS loan legs fail the coverage guard. Steakhouse's
+  USDe/USDC $338M is unjudged too. Reported next to the breach shares.
+- Lane 3b / finding 4 (added 2026-09-08 after the owner asked whether the
+  conclusion should give an optimal LLTV per chain and pair): history-implied
+  maximum tier = highest allowed LLTV whose bad-debt buffer exceeds the
+  pair's worst drop, per horizon. Pair-level only; the chain enters via the
+  clearing horizon (loop 03) and costs — that join is the next run and
+  yields the per-chain recommendation.
 - Owner review of the first README (2026-09-08), all applied: 2025-10-10
   was a crypto-wide crash, not a HYPE crash; no mention of prior
   assumptions or internal discussion (the "smaller than 1 - LLTV" aside is
