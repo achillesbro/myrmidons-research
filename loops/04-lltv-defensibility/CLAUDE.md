@@ -47,14 +47,34 @@ Internal notes; the README is the publication-ready document.
   during the live period; a fast market alone yields a few percent of
   apparent cross move. At 24h those pairs sit at the resolution limit of
   the data; same-minute alignment of the legs is the refinement.
-- Curator benchmark mechanics: Morpho Blue markets are permissionless, so
-  a curator does not SET an LLTV — it chooses which LLTV market to fund.
-  `vault_allocations` (latest snapshot per vault, supply > 0) joined to
-  `vaults.name` gives each vault's funded markets; the vault name carries
-  the curator (Gauntlet, Steakhouse, Block Analitica, MEV Capital, ...).
-  The benchmark is therefore: the share of each curator's supplied USD that
-  sits in markets whose history has breached the bad-debt buffer, per
-  horizon, and where curators disagree on the same collateral.
+- Curator benchmark mechanics: Morpho Blue markets are permissionless —
+  anyone can create a market at an allowed LLTV
+  (docs.morpho.org/curate/tutorials-market-v1/creating-market) and anyone
+  can supply to one, so a curator picks the LLTV both when it deploys and
+  when it funds. `vault_allocations` (latest snapshot per vault, supply > 0)
+  joined to `vaults.name` gives each vault's funded markets. The benchmark
+  is the share of each curator's supplied USD that sits in markets whose
+  history has breached the bad-debt buffer, per horizon, and where curators
+  disagree on the same collateral.
+- Curator identity (owner review 2026-09-08): the vault name's first word
+  was wrong for Vault Bridge (USDC vault = Steakhouse Financial; USDT/WETH/
+  WBTC vaults = Gauntlet), Smokehouse (= Steakhouse Financial), Index Coop
+  hyETH / Metronome / SwissBorg / Extrafi (= Gauntlet), Moonwell Flagship
+  (= Anthias Labs), Usual Boosted USDC / EURCV Prime (= MEV Capital), Yield
+  Clearstar (= Clearstar). The notebook now reads the Morpho API's curator
+  registry — V1 `vaults{state{curators{name}}}`, V2
+  `vaultV2s{curators{items{name}}}` (V1 has no top-level `curators`; its
+  `metadata` holds only description/image) — pages of 100 per chain, keeps
+  the tracked vaults, saves `assets/vault_curators.csv` (78 vaults) and
+  falls back to the CSV when the API is unreachable. Two tracked vaults
+  have no registry curator on the three chains (MYRMIDONS USDT0 / WHYPE) and
+  keep the first word; a first-word fallback is mapped to the registry
+  spelling when one starts with it ('Steakhouse' -> 'Steakhouse Financial').
+  MNEMON has no curator column anywhere; the durable fix is a `curator`
+  column on the `vaults` dimension so the loop reads it from the snapshot.
+  With registry names the >= $20M set went from seven labels to five
+  (Gauntlet 531 / Steakhouse Financial 399 / SparkDAO 313 / Felix 32 /
+  Hakutora 26); Gauntlet 97.3%/6.1%, Steakhouse 95.7%/8.7%.
 - Re-running the notebook needs MNEMON_REPO set and the snapshot rsynced;
   outputs/ arrives with the same rsync (canonical rows are VPS-written).
 - First cross-section: cycle 2026-09-08 08:00 UTC (17 family cycles
@@ -71,10 +91,15 @@ Internal notes; the README is the publication-ready document.
   borrow == supply, a synthetic position that dominates any weighted
   figure; RLP/USDC ($50M) and AZND/USDC are unlisted too. The README's
   weighted numbers use listed markets; the notebook prints both.
-- Curator label collisions from the first-word rule: "Vault" = Vault
-  Bridge, "Yield" = Yield Clearstar (Clearstar), "Smokehouse" = Steakhouse's
-  higher-risk line, "MEV" = MEV Capital, "Index" = Index Coop. Named in the
-  README where it matters.
+- Owner review of the first README (2026-09-08), all applied: 2025-10-10
+  was a crypto-wide crash, not a HYPE crash; no mention of prior
+  assumptions or internal discussion (the "smaller than 1 - LLTV" aside is
+  gone — loops are self-contained); curators also deploy markets, not only
+  fund them; plain wording throughout (no "does the history split them",
+  no "the headroom of a collateral that never moved"); a worked example of
+  buffer / worst_drop / headroom on cbBTC/USDC 86% in "What the metric is";
+  chart 1 has one panel per horizon (1h 75 / 6h 116 / 24h 159 breached of
+  248) so the 1h and 6h horizons are visible, not only in chart 2.
 - The "sparse legs" count in the notebook lists loan symbols too (USDC 73):
   USDC is the loan leg of most sparse-collateral markets, not itself
   sparse. The coverage in params is the cross rate's; per-leg coverage is
