@@ -1,0 +1,13 @@
+{
+  "snapshot_date": "2026-09-08",
+  "mnemon_commit": "a10446e71355ca5a5ae2cece38896863a778ca2b",
+  "metron_version": "v1.4.0",
+  "tables": [
+    "outputs/market_metrics",
+    "outputs/liq_capacity",
+    "markets",
+    "vaults",
+    "vault_allocations",
+    "prices"
+  ]
+}
