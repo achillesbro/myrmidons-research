@@ -1198,8 +1198,8 @@ wheels = [
 
 [[package]]
 name = "myrmidons-api"
-version = "0.1.0"
-source = { git = "ssh://git@github.com/achillesbro/myrmidons-api.git?tag=v0.1.0#8fc25e500c740279eb952f0f9cc983ed4fb33d11" }
+version = "0.4.18"
+source = { git = "ssh://git@github.com/achillesbro/myrmidons-api.git?tag=v0.4.18#f7e146fe7fa2d667222d49ff1805e15ad571e561" }
 dependencies = [
     { name = "duckdb" },
     { name = "myrmidons-metron" },
@@ -1209,8 +1209,8 @@ dependencies = [
 
 [[package]]
 name = "myrmidons-metron"
-version = "1.3.0"
-source = { git = "ssh://git@github.com/achillesbro/METRON.git?tag=v1.3.0#9b689be941cf966de0dd776643573834fca74a0d" }
+version = "1.4.0"
+source = { git = "ssh://git@github.com/achillesbro/METRON.git?tag=v1.4.0#c65b66b4c29062ed35c66a12aa8ee9798d31572e" }
 dependencies = [
     { name = "numpy" },
     { name = "pandas" },
@@ -1241,8 +1241,8 @@ requires-dist = [
     { name = "duckdb" },
     { name = "jupyter" },
     { name = "matplotlib" },
-    { name = "myrmidons-api", git = "ssh://git@github.com/achillesbro/myrmidons-api.git?tag=v0.1.0" },
-    { name = "myrmidons-metron", git = "ssh://git@github.com/achillesbro/METRON.git?tag=v1.3.0" },
+    { name = "myrmidons-api", git = "ssh://git@github.com/achillesbro/myrmidons-api.git?tag=v0.4.18" },
+    { name = "myrmidons-metron", git = "ssh://git@github.com/achillesbro/METRON.git?tag=v1.4.0" },
     { name = "pandas" },
     { name = "pyarrow" },
 ]
